@@ -9,8 +9,7 @@
 // `?api=http://localhost:8110` to the page URL.
 
 (() => {
-  const DEFAULT_API = '';
-  const API_BASE = (new URL(window.location.href).searchParams.get('api')) || DEFAULT_API;
+  const { API_BASE, el, getJson, showError, clearError, fmtLatency, fmtPct } = window.SteemAPI;
   const REFRESH_MS = 60_000;
 
   // --- UI state: filters + sorting, round-tripped through the URL ---------
@@ -94,45 +93,6 @@
   // One Chart.js instance per node, keyed by URL. Re-rendering re-uses the
   // instance and updates .data — full rebuild would leak listeners.
   const sparkCharts = new Map();
-
-  const el = (tag, attrs = {}, children = []) => {
-    const node = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs)) {
-      if (k === 'class') node.className = v;
-      else if (k === 'dataset') Object.assign(node.dataset, v);
-      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
-      else node.setAttribute(k, v);
-    }
-    for (const c of [].concat(children)) {
-      if (c == null) continue;
-      node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
-    }
-    return node;
-  };
-
-  const fmtLatency = ms => (ms == null ? '—' : String(ms));
-  const fmtPct = pct => (pct == null ? '—' : pct.toFixed(pct < 99 ? 1 : 2));
-  const fmtLag = lag => (lag == null ? '—' : String(lag));
-
-  const showError = msg => {
-    let banner = document.getElementById('error-banner');
-    if (!banner) {
-      banner = el('div', { id: 'error-banner', class: 'error-banner' });
-      document.querySelector('.container').prepend(banner);
-    }
-    banner.textContent = msg;
-  };
-  const clearError = () => {
-    const banner = document.getElementById('error-banner');
-    if (banner) banner.remove();
-  };
-
-  async function getJson(path) {
-    const url = `${API_BASE}${path}`;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
-    return r.json();
-  }
 
   function renderSparkline(canvas, points) {
     // Chart.js is loaded via defer; this function is only called after
@@ -227,7 +187,14 @@
       ]));
     }
 
-    return el('div', { class: 'node-card' }, children);
+    // Whole-card link to the detail page. We keep the dev `?api=` override
+    // on the href so a tunneled session stays tunneled on the next page.
+    const href = (() => {
+      const p = new URLSearchParams({ url: node.url });
+      if (API_BASE) p.set('api', API_BASE);
+      return `node.html?${p.toString()}`;
+    })();
+    return el('a', { class: 'node-card', href }, children);
   }
 
   async function hydrateNode(node) {

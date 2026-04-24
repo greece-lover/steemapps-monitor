@@ -364,6 +364,229 @@ a:hover { text-decoration: underline; }
 }
 .reset-btn:hover { color: var(--text); border-color: var(--accent-dim); }
 
+/* ---------- Detail page (Phase 6 Etappe 2) ---------- */
+
+.back-link {
+  display: inline-block;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 8px 4px 0;
+  margin-right: 14px;
+  transition: color 120ms ease;
+}
+.back-link:hover { color: var(--accent); }
+
+.brand-tagline .sep { color: var(--text-dim); margin: 0 8px; }
+.status-pill .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+.meta-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.range-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+.range-toggle button {
+  background: transparent;
+  color: var(--text-muted);
+  border: 0;
+  padding: 6px 14px;
+  font: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+.range-toggle button + button { border-left: 1px solid var(--border); }
+.range-toggle button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.range-toggle button:hover:not(.active) { color: var(--text); }
+
+.share-btn {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.share-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
+
+.detail-section {
+  margin-bottom: 40px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-section:last-child { border-bottom: 0; }
+
+.section-sub {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.chart-wrap.tall { height: 320px; }
+.chart-wrap { position: relative; height: 200px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
+
+/* Compare picker */
+.compare-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.compare-wrap { position: relative; }
+.compare-toggle {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.compare-toggle:hover { color: var(--text); border-color: var(--accent-dim); }
+.compare-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  min-width: 260px;
+  z-index: 10;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.compare-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.compare-option input[type=checkbox] { accent-color: var(--accent); }
+.compare-option .muted { color: var(--text-dim); }
+
+.compare-legend {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.chip-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+}
+.chip-swatch.small { width: 10px; height: 3px; }
+
+/* Data tables */
+.table-wrap { overflow-x: auto; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.data-table thead th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+}
+.data-table tbody tr:hover { background: var(--bg-card); }
+.data-table td.muted { color: var(--text-dim); }
+.data-table td.loading { color: var(--text-dim); text-align: center; }
+
+/* Uptime calendar */
+.uptime-calendar {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(18px, 1fr));
+  gap: 3px;
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: default;
+}
+.cal-cell.green  { background: var(--status-ok); }
+.cal-cell.yellow { background: var(--status-deg); }
+.cal-cell.red    { background: var(--status-down); }
+.cal-cell.grey   { background: var(--status-unknown); }
+
+.calendar-legend {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.calendar-legend .ck {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+.calendar-legend .ck.green  { background: var(--status-ok); }
+.calendar-legend .ck.yellow { background: var(--status-deg); }
+.calendar-legend .ck.red    { background: var(--status-down); }
+.calendar-legend .ck.grey   { background: var(--status-unknown); }
+
+/* Severity pills */
+.sev-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+}
+.sev-short { background: rgba(232, 195, 74, 0.15); color: var(--status-deg); }
+.sev-real  { background: rgba(239, 106, 106, 0.15); color: var(--status-down); }
+
+/* Make the whole card clickable but keep colours */
+a.node-card {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+}
+a.node-card:hover { border-color: var(--accent-dim); }
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 600px) {
@@ -378,4 +601,8 @@ a:hover { text-decoration: underline; }
 
   .controls { gap: 10px 14px; padding: 12px; }
   .reset-btn { margin-left: 0; }
+
+  .uptime-calendar { grid-template-columns: repeat(10, 1fr); }
+  .chart-wrap.tall { height: 260px; }
+  .compare-picker { left: 0; right: auto; }
 }
