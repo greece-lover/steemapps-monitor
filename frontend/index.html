@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Steem API Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="site-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <div class="brand-title">Steem API Monitor</div>
+        <div class="brand-tagline">Independent uptime tracking for public Steem nodes.</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="meta-row">
+        <span class="meta-label">Methodology</span>
+        <span class="meta-value" id="meta-methodology">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Reference block</span>
+        <span class="meta-value" id="meta-refblock">—</span>
+      </div>
+      <div class="meta-row">
+        <span class="meta-label">Updated</span>
+        <span class="meta-value" id="meta-updated">—</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <section aria-labelledby="nodes-heading">
+    <h2 id="nodes-heading" class="section-title">Nodes</h2>
+    <div id="nodes" class="node-grid">
+      <p class="loading">Loading…</p>
+    </div>
+  </section>
+
+  <section class="footnote">
+    <p>Measured every 60 seconds from a single location. Rules and penalty values are pinned in
+       <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/MEASUREMENT-METHODOLOGY.md">
+         MEASUREMENT-METHODOLOGY.md</a>. All timestamps are UTC.</p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
+<script src="js/main.js" defer></script>
+</body>
+</html>

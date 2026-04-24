@@ -1,0 +1,276 @@
+/* Steem API Monitor — Phase 4 dashboard.
+   Shares the steemapps.com design language: dark background, lime accent,
+   Inter Tight (body / UI) and Fraunces (display numbers). Mobile-first,
+   breakpoint at 600 px collapses the node grid to a single column. */
+
+:root {
+  --bg:           #0a0a0a;
+  --bg-raised:   #141414;
+  --bg-card:     #181818;
+  --bg-card-hover: #1f1f1f;
+  --border:      #262626;
+  --text:        #ededed;
+  --text-muted:  #8c8c8c;
+  --text-dim:    #5e5e5e;
+
+  --accent:      #b7e34a;       /* lime */
+  --accent-dim:  #4c5a20;
+
+  --status-ok:   #5eea88;
+  --status-deg:  #e8c34a;
+  --status-down: #ef6a6a;
+  --status-unknown: #4b4b4b;
+
+  --radius:      10px;
+  --radius-sm:   6px;
+
+  --mono:        ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
+  --display:     "Fraunces", Georgia, serif;
+  --body:        "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ---------- Header ---------- */
+
+.site {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+.site-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 24px;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.brand-mark {
+  width: 10px;
+  height: 40px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.brand-title {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.brand-tagline {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 220px;
+}
+.meta-label { color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+.meta-value { font-family: var(--mono); color: var(--text); font-size: 12px; }
+
+/* ---------- Main ---------- */
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+
+.section-title {
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0 0 16px;
+  color: var(--text-muted);
+}
+
+.loading {
+  color: var(--text-muted);
+  padding: 32px 0;
+}
+
+/* ---------- Node cards ---------- */
+
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.node-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.node-card:hover {
+  background: var(--bg-card-hover);
+  border-color: #323232;
+}
+
+.node-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.node-url {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+  word-break: break-all;
+}
+.node-region {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.status-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-unknown);
+}
+.status-pill[data-status="ok"]       .dot { background: var(--status-ok); }
+.status-pill[data-status="degraded"] .dot { background: var(--status-deg); }
+.status-pill[data-status="down"]     .dot { background: var(--status-down); }
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.stat {
+  min-width: 0;
+}
+.stat-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.stat-value {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  line-height: 1.15;
+  margin-top: 2px;
+}
+.stat-value.muted { color: var(--text-muted); }
+.stat-unit {
+  font-family: var(--body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.spark-wrap {
+  height: 56px;
+  position: relative;
+}
+
+.reasons {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.reasons .label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  display: block;
+  margin-bottom: 4px;
+}
+.reasons ul { margin: 0; padding-left: 18px; }
+
+/* ---------- Footnote ---------- */
+
+.footnote {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ---------- Error banner ---------- */
+
+.error-banner {
+  background: rgba(239, 106, 106, 0.08);
+  border: 1px solid rgba(239, 106, 106, 0.3);
+  color: var(--status-down);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 600px) {
+  .site-inner { padding: 20px 16px; }
+  .container { padding: 24px 16px 48px; }
+  .meta { width: 100%; }
+  .node-grid { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-value { font-size: 20px; }
+  .brand-title { font-size: 18px; }
+  .brand-tagline { font-size: 12px; }
+}
