@@ -336,6 +336,67 @@ def test_chain_availability_rejects_30d(app_and_db):
 #  /stats/daily-comparison
 # =============================================================================
 
+def test_regions_aggregates_by_region(app_and_db):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc)
+    # Node A in eu-central, Node B in us-east. Different latencies, both
+    # fully up — regional aggregates should average independently.
+    for i in range(5):
+        _insert(db, now - timedelta(minutes=i), NODE_A, ok=True, latency=100)
+        _insert(db, now - timedelta(minutes=i), NODE_B, ok=True, latency=500)
+
+    # The test fixture pins NODE_A region='eu-central' and NODE_B='us-west'
+    # by default. Override so we can verify both anchored and un-anchored
+    # regions make it through.
+    import json, config, pathlib
+    (pathlib.Path(db).parent / "nodes.json").write_text(json.dumps([
+        {"url": NODE_A, "region": "eu-central"},
+        {"url": NODE_B, "region": "us-east"},
+    ]))
+
+    r = client.get("/api/v1/regions")
+    assert r.status_code == 200
+    body = r.json()
+    regions = {r["region"]: r for r in body["regions"]}
+    assert "eu-central" in regions and "us-east" in regions
+
+    eu = regions["eu-central"]
+    assert eu["node_count"] == 1
+    assert eu["lat"] is not None and eu["lng"] is not None
+    assert eu["avg_latency_ms"] == 100.0
+    assert eu["avg_uptime_pct_24h"] == 100.0
+    assert eu["status"] == "ok"
+    assert eu["nodes"][0]["url"] == NODE_A
+
+    us = regions["us-east"]
+    assert us["node_count"] == 1
+    assert us["avg_latency_ms"] == 500.0
+
+
+def test_regions_handles_anchorless_region(app_and_db, monkeypatch):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc)
+    import json, pathlib
+    (pathlib.Path(db).parent / "nodes.json").write_text(json.dumps([
+        {"url": NODE_A, "region": "global"},
+        {"url": NODE_B, "region": "eu-central"},
+    ]))
+    _insert(db, now, NODE_A, ok=True)
+    _insert(db, now, NODE_B, ok=True)
+
+    r = client.get("/api/v1/regions")
+    assert r.status_code == 200
+    by = {r["region"]: r for r in r.json()["regions"]}
+    # "global" exists in the response, its lat/lng are None (no anchor),
+    # and it sorts after anchored regions because of the "lat is None"
+    # tie-breaker in the response.
+    assert by["global"]["lat"] is None
+    assert by["global"]["lng"] is None
+    # Anchored region precedes anchorless in the returned list.
+    regions_order = [r["region"] for r in r.json()["regions"]]
+    assert regions_order.index("eu-central") < regions_order.index("global")
+
+
 def test_daily_comparison_partitions_three_windows(app_and_db):
     client, db = app_and_db
     now = datetime.now(timezone.utc)

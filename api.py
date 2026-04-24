@@ -518,6 +518,95 @@ def build_app() -> FastAPI:
             "ranked": ranked[:limit],
         }
 
+    @ttl_cache(60)
+    def _regions_aggregate(db_path_key: str) -> dict:
+        """Aggregate the fleet by region for the /regions endpoint.
+
+        Uses current status (last tick per node) for the pill colour and
+        the 24-hour aggregate for latency + uptime averages. Regions with
+        no geographic anchor (global / unknown) still appear in the table
+        but carry `lat`/`lng`=None, so map code must skip them."""
+        nodes = config.load_nodes()
+        latest = database.get_latest_per_node(db_path=db_path_key)
+        aggs_24h = {a["node_url"]: a for a in database.get_per_node_aggregates(24 * 60, db_path=db_path_key)}
+        aggs_7d = {a["node_url"]: a for a in database.get_per_node_aggregates(7 * 24 * 60, db_path=db_path_key)}
+        ref = _reference_block(latest)
+
+        # Group nodes by region, compute per-region aggregates.
+        by_region: dict[str, list] = {}
+        for n in nodes:
+            by_region.setdefault(n.get("region") or "unknown", []).append(n)
+
+        out = []
+        for region, region_nodes in by_region.items():
+            geo = config.REGION_COORDINATES.get(region, {"lat": None, "lng": None, "label": region})
+            node_rows = []
+            avg_latency_samples: list[int] = []
+            uptime_pcts: list[float] = []
+            any_down = False
+            any_degraded = False
+            for n in region_nodes:
+                url = n["url"]
+                last = latest.get(url)
+                agg = aggs_24h.get(url, {})
+                agg7 = aggs_7d.get(url, {})
+                if last is None:
+                    node_rows.append({
+                        "url": url, "status": "unknown", "score": None,
+                        "latency_ms": None, "uptime_pct_24h": None, "uptime_pct_7d": None,
+                    })
+                    continue
+                # Score a single node using the same path /status does.
+                recent = database.get_recent_measurements(url, limit=20, db_path=db_path_key)
+                breakdown = scoring.calculate_score(
+                    recent, reference_block=ref,
+                    current_ok=bool(last["success"]),
+                    current_latency_ms=last.get("latency_ms"),
+                    current_block_height=last.get("block_height"),
+                )
+                status_label = scoring.status_label(breakdown.score, bool(last["success"]))
+                if status_label == "down": any_down = True
+                elif status_label in ("warning", "critical"): any_degraded = True
+                if agg.get("avg_latency_ms") is not None:
+                    avg_latency_samples.append(agg["avg_latency_ms"])
+                if agg.get("uptime_pct") is not None:
+                    uptime_pcts.append(agg["uptime_pct"])
+                node_rows.append({
+                    "url": url,
+                    "status": status_label,
+                    "score": breakdown.score,
+                    "latency_ms": last.get("latency_ms"),
+                    "uptime_pct_24h": agg.get("uptime_pct"),
+                    "uptime_pct_7d": agg7.get("uptime_pct"),
+                })
+            region_status = "down" if any_down else ("warning" if any_degraded else "ok")
+            if all(r["status"] == "unknown" for r in node_rows):
+                region_status = "unknown"
+            out.append({
+                "region": region,
+                "label": geo.get("label") or region,
+                "lat": geo.get("lat"),
+                "lng": geo.get("lng"),
+                "node_count": len(region_nodes),
+                "status": region_status,
+                "avg_latency_ms": round(sum(avg_latency_samples) / len(avg_latency_samples), 1) if avg_latency_samples else None,
+                "avg_uptime_pct_24h": round(sum(uptime_pcts) / len(uptime_pcts), 2) if uptime_pcts else None,
+                "nodes": node_rows,
+            })
+        # Stable ordering: geographic regions first (by label), then
+        # no-anchor regions at the end.
+        out.sort(key=lambda r: (r["lat"] is None, r["label"]))
+        return {"regions": out}
+
+    @app.get("/api/v1/regions")
+    def regions() -> dict:
+        """Regional aggregates for the map and the aggregate table."""
+        data = _regions_aggregate(str(database.DB_PATH))
+        return {
+            "generated_at": _utcnow_iso(),
+            **data,
+        }
+
     @app.get("/api/v1/stats/chain-availability")
     def stats_chain_availability(range: str = Query("24h", pattern="^(24h|7d)$")) -> dict:
         """Fleet-wide up/down counts bucketed over time.
