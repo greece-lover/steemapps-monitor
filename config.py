@@ -28,10 +28,12 @@ REQUEST_TIMEOUT_S: float = 8.0
 # The JSON-RPC method used as our liveness probe.
 PROBE_METHOD: str = "condenser_api.get_dynamic_global_properties"
 
-# FastAPI / uvicorn binding. Phase 3 keeps the API on loopback only; a
-# reverse proxy will expose it publicly in Phase 4.
+# FastAPI / uvicorn binding. Loopback-only; a reverse proxy exposes the API
+# publicly on the production host. Port is overridable via env so a
+# second instance (e.g. the production monitor next to the dev VM) can
+# coexist with the default.
 API_HOST: str = "127.0.0.1"
-API_PORT: int = 8110
+API_PORT: int = int(os.environ.get("STEEMAPPS_API_PORT", "8110"))
 
 # Methodology version recorded in every API response — see
 # docs/MEASUREMENT-METHODOLOGY.md.
