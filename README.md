@@ -26,24 +26,28 @@ This project fills that gap with a Python service that measures every known Stee
 
 ## Status
 
-Phase 2 — project scaffolding and documentation foundation. No monitor code yet. See [ROADMAP.md](ROADMAP.md).
+Phase 3 — monitor core implemented (poll loop, SQLite, scoring, FastAPI, systemd unit). 18/18 tests green locally; VM deployment pending. See [ROADMAP.md](ROADMAP.md).
 
 The repository is **private** until the first automated daily report runs successfully. At that point it will be switched to public, with an announcement post on Steemit.
 
 ## Quick start (developer preview)
-
-No code to run yet. When the first monitor version lands:
 
 ```bash
 git clone git@github.com:greece-lover/steemapps-monitor.git
 cd steemapps-monitor
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env.local && edit .env.local
-systemctl --user start steemapps-monitor  # or run manually: python -m monitor
+python monitor.py                  # polls every 60 s, serves 127.0.0.1:8110
 ```
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the production setup (systemd unit, database path, log rotation).
+Tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+See [deploy/README.md](deploy/README.md) for the VM install (systemd unit, data path).
 
 ## Architecture at a glance
 

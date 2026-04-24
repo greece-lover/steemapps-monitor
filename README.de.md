@@ -26,24 +26,28 @@ Dieses Projekt schließt diese Lücke mit einem Python-Dienst, der jeden bekannt
 
 ## Status
 
-Phase 2 — Projekt-Gerüst und Dokumentations-Basis. Noch kein Monitor-Code. Siehe [ROADMAP.de.md](ROADMAP.de.md).
+Phase 3 — Monitor-Kern implementiert (Poll-Schleife, SQLite, Scoring, FastAPI, systemd-Unit). 18/18 Tests lokal grün; VM-Deploy steht noch aus. Siehe [ROADMAP.de.md](ROADMAP.de.md).
 
 Das Repository bleibt **privat**, bis der erste automatisierte Tages-Report erfolgreich läuft. Zu diesem Zeitpunkt wird es auf öffentlich umgeschaltet, begleitet von einem Ankündigungs-Post auf Steemit.
 
 ## Schnellstart (Entwickler-Vorschau)
-
-Noch kein ausführbarer Code. Sobald die erste Monitor-Version vorliegt:
 
 ```bash
 git clone git@github.com:greece-lover/steemapps-monitor.git
 cd steemapps-monitor
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env.local && nano .env.local
-systemctl --user start steemapps-monitor  # oder manuell: python -m monitor
+python monitor.py                  # pollt alle 60 s, API auf 127.0.0.1:8110
 ```
 
-Für den Produktions-Aufbau (systemd-Unit, Datenbank-Pfad, Log-Rotation) siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Tests:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+Für die VM-Installation (systemd-Unit, Datenpfad) siehe [deploy/README.md](deploy/README.md).
 
 ## Architektur im Überblick
 

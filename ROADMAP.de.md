@@ -12,13 +12,15 @@ Reines Lesen der Entwicklungs-VM. Bestätigung, dass laufende Workloads (Steem-F
 
 Repository, Dokumentations-Basis, SSH-Alias, Server-Arbeitsverzeichnis. Kein Monitor-Code. Zweisprachig DE/EN, wo erforderlich.
 
-## Phase 3 — Monitor-Kern (Ziel: 2026-04-25)
+## Phase 3 — Monitor-Kern 🟡 (2026-04-24, Code fertig)
 
-- Python-Poll-Schleife, JSON-RPC-Client, Minuten-Messung
-- SQLite-Schema (Nodes, Messungen, Ausfälle)
-- Gesundheits-Score-Berechnung
-- systemd-Service, Logging, Fehlerbehandlung
-- Initialer Lauf gegen die vier Start-Nodes; Messqualität 24 h beobachten, bevor weiteres angefasst wird
+- Python-Poll-Schleife, JSON-RPC-Client, Minuten-Messung ✅
+- SQLite-Schema (Nodes, Messungen) ✅
+- Gesundheits-Score nach Methodik `mv1` ✅
+- systemd-Service, Logging, Fehlerbehandlung ✅
+- Lokale Tests: 18/18 grün; Live-Smoke-Test gegen alle vier Nodes OK ✅
+- **Offen:** VM-Deploy + 30-Minuten-Laufzeit-Verifikation (Entwicklungs-VM war am Ende der Code-Session nicht erreichbar; folgt, sobald die VM wieder hochgefahren ist)
+- `outages`-Tabelle in Phase 4 verschoben — Phase 3 persistiert Rohmessungen und berechnet Ausfall-Strecken on-the-fly aus `/api/v1/status`; eine materialisierte Tabelle lohnt sich erst, wenn der Aggregator schnellere Tages-übergreifende Abfragen braucht
 
 ## Phase 4 — Öffentliche JSON-API (Ziel: 2026-04-27)
 

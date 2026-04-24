@@ -12,13 +12,15 @@ Read-only inventory of the development VM. Confirmed that existing workloads (St
 
 Repository, documentation foundation, SSH alias, server working directory. No monitor code yet. Both languages DE/EN in place where required.
 
-## Phase 3 — Monitor core (target: 2026-04-25)
+## Phase 3 — Monitor core 🟡 (2026-04-24, code complete)
 
-- Python poll loop, JSON-RPC client, per-minute measurement
-- SQLite schema (nodes, measurements, outages)
-- Health-score computation
-- systemd service, logging, error handling
-- Initial run against the four launch nodes; validate measurement quality for 24 h before touching anything else
+- Python poll loop, JSON-RPC client, per-minute measurement ✅
+- SQLite schema (nodes, measurements) ✅
+- Health-score computation matching methodology `mv1` ✅
+- systemd service, logging, error handling ✅
+- Local tests: 18/18 green; live smoke test against all four nodes OK ✅
+- **Pending:** VM deployment + 30-minute runtime verification (development VM was unreachable at the end of the coding session; follows as soon as the VM is back up)
+- `outages` table deferred to Phase 4 — Phase 3 persists raw measurements and computes outage stretches on the fly from `/api/v1/status`; a materialised table earns its keep only once the aggregator needs faster cross-day queries
 
 ## Phase 4 — Public JSON API (target: 2026-04-27)
 
