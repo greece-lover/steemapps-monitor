@@ -268,3 +268,89 @@ def test_uptime_daily_validates_days(app_and_db):
     assert r.status_code == 422
     r = client.get(f"/api/v1/nodes/{NODE_A}/uptime-daily?days=91")
     assert r.status_code == 422
+
+
+# =============================================================================
+#  /stats/top — reverse metrics (latency_worst / uptime_worst)
+# =============================================================================
+
+def test_stats_top_latency_worst_sorts_descending(app_and_db):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc)
+    for i in range(3):
+        _insert(db, now - timedelta(minutes=i), NODE_A, ok=True, latency=100)
+        _insert(db, now - timedelta(minutes=i), NODE_B, ok=True, latency=500)
+    r = client.get("/api/v1/stats/top?metric=latency_worst&range=24h&limit=2")
+    assert r.status_code == 200
+    ranked = r.json()["ranked"]
+    # The slow node must be first when we ask for the worst.
+    assert ranked[0]["node_url"] == NODE_B
+    assert ranked[0]["avg_latency_ms"] > ranked[1]["avg_latency_ms"]
+
+
+def test_stats_top_uptime_worst_sorts_ascending(app_and_db):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc)
+    for i in range(4):
+        _insert(db, now - timedelta(minutes=i), NODE_A, ok=True)
+    for i in range(4):
+        _insert(db, now - timedelta(minutes=i), NODE_B, ok=(i % 2 == 0))
+    r = client.get("/api/v1/stats/top?metric=uptime_worst&range=24h&limit=2")
+    assert r.status_code == 200
+    ranked = r.json()["ranked"]
+    assert ranked[0]["node_url"] == NODE_B
+    assert ranked[0]["uptime_pct"] <= ranked[1]["uptime_pct"]
+
+
+# =============================================================================
+#  /stats/chain-availability
+# =============================================================================
+
+def test_chain_availability_buckets_up_and_down(app_and_db):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    # Two nodes over a 30-minute span within the same 10-min bucket, one
+    # fails in the first bucket — so the first bucket sees 1 up + 1 down.
+    for i in range(3):  # 3 ticks within the first 10-min bucket
+        _insert(db, now - timedelta(minutes=60 - i), NODE_A, ok=(i > 0))  # first tick fails
+        _insert(db, now - timedelta(minutes=60 - i), NODE_B, ok=True)
+    r = client.get("/api/v1/stats/chain-availability?range=24h")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["bucket_seconds"] == 600
+    # Every returned bucket must preserve up + down == total.
+    for p in body["points"]:
+        assert p["up"] + p["down"] == p["total"]
+    # Overall counts match the 6 inserts (5 ok + 1 fail).
+    assert sum(p["up"] for p in body["points"]) == 5
+    assert sum(p["down"] for p in body["points"]) == 1
+
+
+def test_chain_availability_rejects_30d(app_and_db):
+    client, _ = app_and_db
+    r = client.get("/api/v1/stats/chain-availability?range=30d")
+    assert r.status_code == 422
+
+
+# =============================================================================
+#  /stats/daily-comparison
+# =============================================================================
+
+def test_daily_comparison_partitions_three_windows(app_and_db):
+    client, db = app_and_db
+    now = datetime.now(timezone.utc)
+    # Today window — drop a fast tick.
+    _insert(db, now - timedelta(hours=1), NODE_A, ok=True, latency=100)
+    # Yesterday window (24 h–48 h ago) — slow tick.
+    _insert(db, now - timedelta(hours=36), NODE_A, ok=True, latency=400)
+    # Last-week window (168 h–192 h ago) — medium tick.
+    _insert(db, now - timedelta(hours=180), NODE_A, ok=True, latency=250)
+
+    r = client.get("/api/v1/stats/daily-comparison")
+    assert r.status_code == 200
+    body = r.json()
+    row = next(n for n in body["nodes"] if n["node_url"] == NODE_A)
+    # Each window must pick up exactly its tick, no cross-window leakage.
+    assert row["today"]["avg_latency_ms"] == 100
+    assert row["yesterday"]["avg_latency_ms"] == 400
+    assert row["lastweek"]["avg_latency_ms"] == 250
