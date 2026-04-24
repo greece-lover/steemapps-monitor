@@ -71,6 +71,7 @@
   async function loadAvailability(range) {
     const data = await getJson(`/api/v1/stats/chain-availability?range=${range}`);
     const canvas = document.getElementById('availability-chart');
+    const c = window.SteemAPI.chartColors();
     const labels = data.points.map(p => p.ts);
     const up = data.points.map(p => p.up);
     const down = data.points.map(p => p.down);
@@ -80,14 +81,14 @@
       data: {
         labels,
         datasets: [
-          { label: 'up', data: up, borderColor: '#5eea88', backgroundColor: '#5eea8855', fill: 'origin', stack: 'fleet', tension: 0.25, pointRadius: 0, borderWidth: 1.2 },
-          { label: 'down', data: down, borderColor: '#ef6a6a', backgroundColor: '#ef6a6a55', fill: 'origin', stack: 'fleet', tension: 0.25, pointRadius: 0, borderWidth: 1.2 },
+          { label: 'up', data: up, borderColor: c.ok, backgroundColor: c.ok + '55', fill: 'origin', stack: 'fleet', tension: 0.25, pointRadius: 0, borderWidth: 1.2 },
+          { label: 'down', data: down, borderColor: c.down, backgroundColor: c.down + '55', fill: 'origin', stack: 'fleet', tension: 0.25, pointRadius: 0, borderWidth: 1.2 },
         ],
       },
       options: {
         responsive: true, maintainAspectRatio: false, animation: false,
         plugins: {
-          legend: { labels: { color: '#8c8c8c' } },
+          legend: { labels: { color: c.tick } },
           tooltip: {
             mode: 'index', intersect: false,
             callbacks: {
@@ -99,15 +100,15 @@
           x: {
             type: 'time',
             time: { unit: range === '24h' ? 'hour' : 'day' },
-            ticks: { color: '#8c8c8c', maxTicksLimit: 10 },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, maxTicksLimit: 10 },
+            grid: { color: c.grid },
           },
           y: {
             stacked: true,
             beginAtZero: true,
-            ticks: { color: '#8c8c8c', precision: 0 },
-            grid: { color: '#1e1e1e' },
-            title: { display: true, text: 'ticks / bucket', color: '#8c8c8c' },
+            ticks: { color: c.tick, precision: 0 },
+            grid: { color: c.grid },
+            title: { display: true, text: 'ticks / bucket', color: c.tick },
           },
         },
       },
@@ -121,6 +122,7 @@
   async function loadGlobalLatency(range) {
     // Pull /status for the node list, then /detail per node in parallel.
     // Cached server-side, so repeat loads in the same minute are cheap.
+    const c = window.SteemAPI.chartColors();
     const status = await getJson('/api/v1/status');
     const details = await Promise.all(
       status.nodes.map(n => getJson(`/api/v1/nodes/${encodeURIComponent(n.url)}/detail?range=${range}`)
@@ -153,13 +155,13 @@
           x: {
             type: 'time',
             time: { unit: range === '24h' ? 'hour' : 'day' },
-            ticks: { color: '#8c8c8c', maxTicksLimit: 10 },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, maxTicksLimit: 10 },
+            grid: { color: c.grid },
           },
           y: {
             beginAtZero: true,
-            ticks: { color: '#8c8c8c', callback: v => v + ' ms' },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, callback: v => v + ' ms' },
+            grid: { color: c.grid },
           },
         },
       },
