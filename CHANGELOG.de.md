@@ -7,6 +7,39 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 ## [Unveröffentlicht]
 
+### Noch offen für Phase-5-Produktions-Cutover
+
+- `reporter/.env.local` auf der VM, Posting-Key manuell vom Autor eingetragen (nie per Chat übertragen)
+- Erster Dry-Run auf der VM gegen die Live-Mess-DB
+- Erster `STEEMAPPS_REPORTER_MODE=prod`-Broadcast manuell über `systemctl start steemapps-reporter.service` ausgelöst
+- Timer aktivieren, sobald der erste echte Post auf steemit.com verifiziert ist
+
+## [Phase 5] — 2026-04-24
+
+### Neu
+
+- `reporter/` — neues Python-Paket: `config.py` (ENV-Laden, `.env.local`-Reader, `ReporterConfig`-Dataclass), `query.py` (read-only SQL über das UTC-Tagesfenster), `aggregation.py` (reine Per-Node-/Global-/Wochen-Aggregation, `custom_json`-Payload-Builder), `template.py` (zweisprachiger DE/EN-Post-Renderer), `broadcast.py` (beem-Lazy-Import-Wrapper mit 3×60s-Retry und Permanent-/Transient-Fehler-Klassifikation), `daily_report.py` (CLI-Entry + `--seed-synthetic`-Dev-Helfer)
+- `reporter/.env.example` — kommentierte ENV-Vorlage; `.env.local` ist die Live-Kopie auf der VM, immer `chmod 600` und im Besitz von `steemapps-reporter`
+- `requirements-reporter.txt` — `beem>=0.24.26,<0.30`, getrennt von `requirements.txt`, damit der Monitor-Service-Footprint unverändert bleibt
+- `deploy/steemapps-reporter.service` — oneshot-systemd-Unit, läuft als `steemapps-reporter` mit `EnvironmentFile=` auf `.env.local`; identische Hardening-Basis wie die Monitor-Unit plus `ReadOnlyPaths=` für die Mess-DB
+- `deploy/steemapps-reporter.timer` — täglicher Trigger um 02:30 UTC mit `Persistent=true`, damit ein verpasster Run beim nächsten Boot nachgeholt wird
+- `deploy/README.md` — Install-, Dry-Run- und Manual-Trigger-Anleitung für den Reporter
+- `docs/DAILY-REPORT.md` + `docs/TAGES-REPORT.md` — Methodik, Zeitplan, `custom_json`-Schema, Fehlerbehandlungs-Semantik, manuelle Ausführungs-Rezepte
+- `tests/test_aggregation.py` (9 Tests), `tests/test_template.py` (9 Tests), `tests/test_broadcast.py` (7 Tests) — neue Abdeckung für die Reporter-Schicht
+- `progress/2026-04-24-phase5.md` — Phase-5-Progress-Log mit Dry-Run-Sample
+
+### Design-Entscheidungen
+
+- Dedizierter `@steem-api-health`-Reporter-Account statt `@greece-lover` — Trennung der Witness-Identität von der Automations-Ausgabe; eine kompromittierte VM offenbart den Witness-Key nicht
+- Zweistufiger Broadcast: `custom_json` zuerst (Rohaggregation), dann `comment` (lesbarer Post), damit der Post-Body auf den On-Chain-Tx-Hash verweisen kann
+- beem wird lazy innerhalb von `_build_steem()` importiert — Dev-Modus und Test-Suite laufen ohne beem-Installation
+- Footer-Wortlaut (englischer und deutscher Witness-Vote-Absatz) durch Test gepinnt; eine Edit, die den Text verändert, bricht die Suite
+
+### Lokal verifiziert
+
+- 54/54 pytest grün (29 bestehend + 25 neu)
+- Dry-Run gegen einen 14-Tage deterministischen Synthetik-Seed erzeugt einen zweisprachigen Post und eine 2 905-Byte-`custom_json`-Payload; Probe im Phase-5-Progress-Log dokumentiert
+
 ### Noch offen für Phase-3-Abschluss (VM-Deploy)
 
 - Repo klonen, venv einrichten, systemd-Unit auf `/opt/steemapps-monitor/` aktivieren (Entwicklungs-VM war am Ende der Phase-3-Code-Session nicht erreichbar; folgt sobald die VM wieder hochgefahren ist)
