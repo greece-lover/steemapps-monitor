@@ -340,6 +340,45 @@ def _make_outage(start_iso: str, end_iso: str, error_sample: Optional[str], thre
 # ---------- Per-node aggregates used by /stats/top --------------------------
 
 
+def get_uptime_daily(
+    node_url: str,
+    days: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """Per-day uptime totals for one node over the last `days` days.
+
+    SQLite `date(timestamp)` truncates to the UTC date. Days without any
+    measurements are omitted here — the API layer fills them in as
+    `{ok: 0, total: 0, uptime_pct: null}` so the frontend calendar
+    always has a contiguous date range to render.
+    """
+    cutoff_iso = _utcnow_iso()
+    delta = f"-{int(days)} days"
+    sql = """
+    SELECT date(timestamp) AS day,
+           COUNT(*)        AS total,
+           SUM(success)    AS ok
+      FROM measurements
+     WHERE node_url = ?
+       AND timestamp >= datetime(?, ?)
+     GROUP BY day
+     ORDER BY day
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (node_url, cutoff_iso, delta)).fetchall()
+    out = []
+    for r in rows:
+        total = int(r["total"] or 0)
+        ok = int(r["ok"] or 0)
+        out.append({
+            "date": r["day"],
+            "total": total,
+            "ok": ok,
+            "uptime_pct": round(100.0 * ok / total, 2) if total else None,
+        })
+    return out
+
+
 def get_per_node_aggregates(
     lookback_minutes: int,
     db_path: Path | str = DB_PATH,

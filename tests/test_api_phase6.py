@@ -235,3 +235,36 @@ def test_stats_top_rejects_unknown_metric(app_and_db):
     client, _ = app_and_db
     r = client.get("/api/v1/stats/top?metric=bogus&range=24h")
     assert r.status_code == 422
+
+
+# =============================================================================
+#  /nodes/{url}/uptime-daily
+# =============================================================================
+
+def test_uptime_daily_fills_missing_days(app_and_db):
+    client, db = app_and_db
+    today = datetime.now(timezone.utc).date()
+    # Only two days have data; the rest must come back as null-uptime entries.
+    _insert(db, datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc), NODE_A, ok=True)
+    _insert(db, datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc) - timedelta(days=2), NODE_A, ok=True)
+    r = client.get(f"/api/v1/nodes/{NODE_A}/uptime-daily?days=5")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["days"] == 5
+    uptime = body["uptime"]
+    assert len(uptime) == 5  # contiguous
+    # Endpoint is the most recent day.
+    assert uptime[-1]["date"] == today.isoformat()
+    # Today and day-2 have data; day-1, day-3, day-4 don't.
+    with_data = [u for u in uptime if u["uptime_pct"] is not None]
+    assert len(with_data) == 2
+    for u in with_data:
+        assert u["uptime_pct"] == 100.0
+
+
+def test_uptime_daily_validates_days(app_and_db):
+    client, _ = app_and_db
+    r = client.get(f"/api/v1/nodes/{NODE_A}/uptime-daily?days=0")
+    assert r.status_code == 422
+    r = client.get(f"/api/v1/nodes/{NODE_A}/uptime-daily?days=91")
+    assert r.status_code == 422

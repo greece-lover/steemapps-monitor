@@ -417,6 +417,36 @@ def build_app() -> FastAPI:
             "outages": outages[:limit],
         }
 
+    @ttl_cache(300)
+    def _uptime_daily(node_url: str, days: int, db_path_key: str) -> list[dict]:
+        sparse = database.get_uptime_daily(node_url, days, db_path=db_path_key)
+        # Fill in missing days so the calendar is contiguous from
+        # (today - days + 1) through today.
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        today = _dt.now(_tz.utc).date()
+        by_day = {r["date"]: r for r in sparse}
+        out = []
+        for i in range(days):
+            d = (today - _td(days=days - 1 - i)).isoformat()
+            if d in by_day:
+                out.append(by_day[d])
+            else:
+                out.append({"date": d, "total": 0, "ok": 0, "uptime_pct": None})
+        return out
+
+    @app.get("/api/v1/nodes/{node_url:path}/uptime-daily")
+    def node_uptime_daily(node_url: str, days: int = Query(30, ge=1, le=90)) -> dict:
+        """Per-day uptime for the calendar view on the node detail page."""
+        url = unquote(node_url)
+        _validate_node(url)
+        data = _uptime_daily(url, days, str(database.DB_PATH))
+        return {
+            "node_url": url,
+            "days": days,
+            "generated_at": _utcnow_iso(),
+            "uptime": data,
+        }
+
     @app.get("/api/v1/stats/top")
     def stats_top(
         metric: str = Query("latency", pattern="^(latency|uptime|errors)$"),
