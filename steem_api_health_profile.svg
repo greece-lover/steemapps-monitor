@@ -1,0 +1,56 @@
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg-grad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1a1e26"/>
+      <stop offset="100%" stop-color="#0a0b0d"/>
+    </radialGradient>
+    <linearGradient id="pulse-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c4f542" stop-opacity="0"/>
+      <stop offset="30%" stop-color="#c4f542"/>
+      <stop offset="70%" stop-color="#c4f542"/>
+      <stop offset="100%" stop-color="#c4f542" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#bg-grad)"/>
+
+  <!-- Outer ring -->
+  <circle cx="200" cy="200" r="170" fill="none" stroke="rgba(196,245,66,0.1)" stroke-width="1" stroke-dasharray="2 4"/>
+  <circle cx="200" cy="200" r="145" fill="none" stroke="rgba(196,245,66,0.15)" stroke-width="1"/>
+
+  <!-- Four node dots around the ring (representing monitored nodes) -->
+  <circle cx="200" cy="55" r="6" fill="#c4f542"/>
+  <circle cx="345" cy="200" r="6" fill="#c4f542"/>
+  <circle cx="200" cy="345" r="6" fill="#c4f542"/>
+  <circle cx="55" cy="200" r="6" fill="#c4f542"/>
+
+  <!-- Diagonal nodes (lighter) -->
+  <circle cx="302" cy="98" r="4" fill="rgba(196,245,66,0.5)"/>
+  <circle cx="302" cy="302" r="4" fill="rgba(196,245,66,0.5)"/>
+  <circle cx="98" cy="302" r="4" fill="rgba(196,245,66,0.5)"/>
+  <circle cx="98" cy="98" r="4" fill="rgba(196,245,66,0.5)"/>
+
+  <!-- Central pulse/heartbeat line -->
+  <g transform="translate(110, 200)" filter="url(#glow)">
+    <path d="M 0,0 L 30,0 L 40,-25 L 55,25 L 70,-40 L 85,40 L 100,-20 L 115,0 L 180,0"
+          fill="none"
+          stroke="#c4f542"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Pulsing center ring -->
+  <circle cx="200" cy="200" r="110" fill="none" stroke="rgba(196,245,66,0.3)" stroke-width="1.5">
+    <animate attributeName="r" values="100;120;100" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/>
+  </circle>
+</svg>
