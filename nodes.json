@@ -1,6 +1,14 @@
 [
-  {"url": "https://api.steemit.com",  "region": "us-east"},
-  {"url": "https://api.justyy.com",   "region": "us-west"},
-  {"url": "https://api.steem.fans",   "region": "asia"},
-  {"url": "https://api.steemyy.com",  "region": "unknown"}
+  {"url": "https://api.steemit.com",             "region": "us-east"},
+  {"url": "https://api.justyy.com",              "region": "us-west"},
+  {"url": "https://api.steem.fans",               "region": "asia"},
+  {"url": "https://api.steemyy.com",             "region": "unknown"},
+  {"url": "https://steem.justyy.com",            "region": "us-central"},
+  {"url": "https://api2.steemyy.com",            "region": "global"},
+  {"url": "https://steem.senior.workers.dev",    "region": "global"},
+  {"url": "https://steemd.steemworld.org",       "region": "eu-central"},
+  {"url": "https://api.campingclub.me",          "region": "asia"},
+  {"url": "https://api.moecki.online",           "region": "eu-central"},
+  {"url": "https://api.dlike.io",                "region": "asia"},
+  {"url": "https://api.boylikegirl.club",        "region": "asia"}
 ]
