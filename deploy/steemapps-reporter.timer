@@ -1,0 +1,15 @@
+[Unit]
+Description=daily trigger for steemapps-reporter
+Documentation=https://github.com/greece-lover/steemapps-monitor
+
+[Timer]
+# Fires every day at 02:30 UTC. Two and a half hours after the UTC day
+# boundary so the monitor's 00:00 and 00:01 ticks are safely in the DB
+# and there's slack for NTP skew or a transient startup delay.
+OnCalendar=*-*-* 02:30:00 UTC
+# Missed runs (VM was off, etc.) are reattempted on next boot.
+Persistent=true
+Unit=steemapps-reporter.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,37 @@
+[Unit]
+Description=steemapps.com daily API-health report (Phase 5)
+Documentation=https://github.com/greece-lover/steemapps-monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=steemapps-reporter
+Group=steemapps-reporter
+WorkingDirectory=/opt/steemapps-monitor
+ExecStart=/opt/steemapps-monitor/.venv/bin/python -m reporter.daily_report
+EnvironmentFile=/opt/steemapps-monitor/reporter/.env.local
+StandardOutput=journal
+StandardError=journal
+
+# Hardening — the reporter reads the SQLite file, signs two operations,
+# and posts them to api.steemit.com. Nothing else is legitimate.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+# The reporter writes no state of its own; it needs read access to the
+# measurements DB (written by the monitor service) and nothing else.
+ReadOnlyPaths=/opt/steemapps-monitor/data
+ReadWritePaths=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

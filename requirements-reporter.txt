@@ -1,0 +1,5 @@
+-r requirements.txt
+# beem pulls in pycryptodome, ecdsa, and a websocket client. Kept out of
+# requirements.txt so the monitor service's footprint doesn't change;
+# installed on the VM alongside the reporter unit.
+beem>=0.24.26,<0.30

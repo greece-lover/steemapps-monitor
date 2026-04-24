@@ -7,6 +7,39 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ## [Unreleased]
 
+### Pending for Phase 5 production cutover
+
+- `reporter/.env.local` on the VM, posting key entered manually by Holger (never transmitted in chat)
+- First dry-run on the VM against the live measurements DB
+- First `STEEMAPPS_REPORTER_MODE=prod` broadcast triggered manually via `systemctl start steemapps-reporter.service`
+- Timer enabled once the first real post is verified on steemit.com
+
+## [Phase 5] — 2026-04-24
+
+### Added
+
+- `reporter/` — new Python package: `config.py` (env loading, `.env.local` reader, `ReporterConfig` dataclass), `query.py` (read-only SQL over the UTC day window), `aggregation.py` (pure per-node/global/week-over-week rollups, `custom_json` payload builder), `template.py` (bilingual DE/EN post renderer), `broadcast.py` (beem lazy-import wrapper with 3×60s retry and permanent/transient error classification), `daily_report.py` (CLI entry + `--seed-synthetic` dev helper)
+- `reporter/.env.example` — commented env template; `.env.local` is the live copy on the VM, always chmod 600 and owned by `steemapps-reporter`
+- `requirements-reporter.txt` — `beem>=0.24.26,<0.30`, kept separate from `requirements.txt` so the monitor service's footprint is unchanged
+- `deploy/steemapps-reporter.service` — oneshot systemd unit running as `steemapps-reporter` with an `EnvironmentFile=` pointing at `.env.local`; same hardening base as the monitor unit plus `ReadOnlyPaths=` for the measurements DB
+- `deploy/steemapps-reporter.timer` — daily trigger at 02:30 UTC with `Persistent=true` so a missed run is retried on next boot
+- `deploy/README.md` — reporter install, dry-run, and manual-trigger instructions
+- `docs/DAILY-REPORT.md` + `docs/TAGES-REPORT.md` — methodology, schedule, `custom_json` schema, error-handling semantics, manual-run recipes
+- `tests/test_aggregation.py` (9 tests), `tests/test_template.py` (9 tests), `tests/test_broadcast.py` (7 tests) — new coverage for the reporter layer
+- `progress/2026-04-24-phase5.md` — Phase 5 progress log with dry-run sample
+
+### Design decisions
+
+- Dedicated `@steem-api-health` reporter account instead of `@greece-lover` — separation of the witness identity from the automation output; a compromised VM does not expose the witness key
+- Two-stage broadcast: `custom_json` first (raw aggregate), then `comment` (human-readable post), so the post body can cite the on-chain tx hash
+- beem imported lazily inside `_build_steem()` — dev mode and the test suite run without beem installed
+- Footer copy (English and German witness-vote paragraph) pinned by test; an edit that changes the wording will fail the suite
+
+### Verified locally
+
+- 54/54 pytest green (29 existing + 25 new)
+- Dry-run against a 14-day deterministic synthetic seed produces a bilingual post and a 2 905-byte `custom_json` payload; sample captured in the Phase-5 progress log
+
 ### Pending for Phase 3 wrap-up (VM deployment)
 
 - Clone repo, install venv, enable systemd unit on `/opt/steemapps-monitor/` (development VM was unreachable at the end of the Phase-3 coding session; follows as soon as the VM is back up)
