@@ -13,7 +13,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
@@ -63,6 +63,19 @@ def _utcnow_iso() -> str:
     # Always second-precision UTC; the methodology doc pins tick timestamps
     # to the 60 s boundary, so sub-second precision would be noise.
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _utc_iso_minus_minutes(minutes: int) -> str:
+    """Cutoff timestamp in the *same* `YYYY-MM-DDTHH:MM:SSZ` shape the monitor
+    writes into the DB. We do NOT hand `datetime(?, '-N minutes')` to SQLite
+    for this: its `datetime()` strips the `T` and `Z`, and once date parts
+    tie, lexicographic comparison puts `'2026-04-23T07:00:00Z'` *above*
+    `'2026-04-23 19:00:00'` (T > space in ASCII). Symptom: rows far outside
+    the window slip past the WHERE filter. Doing the arithmetic in Python
+    keeps both sides of the comparison in identical shape.
+    """
+    dt = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(minutes=int(minutes))
+    return dt.isoformat().replace("+00:00", "Z")
 
 
 @contextmanager
@@ -180,20 +193,21 @@ def get_uptime_stats(
     count — that keeps uptime comparable across nodes even if one of them
     missed some ticks entirely.
     """
-    cutoff_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
     # SQLite compares ISO-8601 strings lexically, which is the right order
-    # for our Zulu timestamps — cheaper than re-parsing.
+    # for our Zulu timestamps as long as both sides share the exact shape
+    # (`YYYY-MM-DDTHH:MM:SSZ`). See _utc_iso_minus_minutes for why we build
+    # the cutoff in Python rather than calling SQLite's datetime().
     sql = """
     SELECT
         COUNT(*) AS total,
         SUM(success) AS ok
       FROM measurements
      WHERE node_url = ?
-       AND timestamp >= datetime(?, ?)
+       AND timestamp >= ?
     """
-    delta = f"-{int(lookback_minutes)} minutes"
     with connect(db_path) as conn:
-        row = conn.execute(sql, (node_url, cutoff_iso, delta)).fetchone()
+        row = conn.execute(sql, (node_url, cutoff_iso)).fetchone()
     total = int(row["total"] or 0)
     ok = int(row["ok"] or 0)
     uptime_pct = (100.0 * ok / total) if total else 0.0
@@ -233,17 +247,16 @@ def get_measurements_range(
     USING INDEX for any lookback. Returns the rows sorted oldest-first so the
     outage detector and downsampler can iterate once.
     """
-    cutoff_iso = _utcnow_iso()
-    delta = f"-{int(lookback_minutes)} minutes"
+    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
     sql = """
     SELECT timestamp, node_url, success, latency_ms, block_height, error_message
       FROM measurements
      WHERE node_url = ?
-       AND timestamp >= datetime(?, ?)
+       AND timestamp >= ?
      ORDER BY timestamp ASC
     """
     with connect(db_path) as conn:
-        rows = conn.execute(sql, (node_url, cutoff_iso, delta)).fetchall()
+        rows = conn.execute(sql, (node_url, cutoff_iso)).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -257,16 +270,15 @@ def get_all_measurements_range(
     node_url first, then timestamp — the outage aggregator buckets by node
     and then walks each bucket in time order.
     """
-    cutoff_iso = _utcnow_iso()
-    delta = f"-{int(lookback_minutes)} minutes"
+    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
     sql = """
     SELECT timestamp, node_url, success, latency_ms, block_height, error_message
       FROM measurements
-     WHERE timestamp >= datetime(?, ?)
+     WHERE timestamp >= ?
      ORDER BY node_url ASC, timestamp ASC
     """
     with connect(db_path) as conn:
-        rows = conn.execute(sql, (cutoff_iso, delta)).fetchall()
+        rows = conn.execute(sql, (cutoff_iso,)).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -340,6 +352,92 @@ def _make_outage(start_iso: str, end_iso: str, error_sample: Optional[str], thre
 # ---------- Per-node aggregates used by /stats/top --------------------------
 
 
+def get_chain_availability(
+    lookback_minutes: int,
+    bucket_seconds: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """Bucketed up/down counts across the whole fleet.
+
+    Buckets are aligned to unix-timestamp boundaries
+    (`floor(ts / bucket_seconds) * bucket_seconds`), so two callers with
+    slightly different "now" timestamps still see the same buckets. The
+    caller must combine `up` and `down` per bucket to know what total
+    fleet-size the chart was drawn against — we intentionally return
+    absolute counts instead of percentages to keep aggregation in the
+    client's hands.
+    """
+    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
+    sql = f"""
+    SELECT (CAST(strftime('%s', timestamp) AS INTEGER) / {int(bucket_seconds)}) * {int(bucket_seconds)} AS bucket_unix,
+           SUM(success)                       AS up_count,
+           COUNT(*) - SUM(success)            AS down_count,
+           COUNT(*)                           AS total
+      FROM measurements
+     WHERE timestamp >= ?
+     GROUP BY bucket_unix
+     ORDER BY bucket_unix
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (cutoff_iso,)).fetchall()
+    out = []
+    for r in rows:
+        ts = datetime.fromtimestamp(int(r["bucket_unix"]), tz=timezone.utc).replace(microsecond=0)
+        out.append({
+            "ts": ts.isoformat().replace("+00:00", "Z"),
+            "up": int(r["up_count"] or 0),
+            "down": int(r["down_count"] or 0),
+            "total": int(r["total"] or 0),
+        })
+    return out
+
+
+def get_per_node_aggregates_between(
+    offset_from_minutes: int,
+    offset_to_minutes: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """Per-node aggregates in a past-relative window.
+
+    `offset_from_minutes` is further in the past, `offset_to_minutes` is
+    closer to now (or 0 for "up to this very moment"). With
+    (from=48*60, to=24*60), you get the "yesterday" bucket. With
+    (from=192*60, to=168*60), you get "the same 24-hour slice a week
+    ago" — which is what the daily-comparison card compares against.
+    """
+    if offset_from_minutes <= offset_to_minutes:
+        raise ValueError("offset_from must be further in the past than offset_to")
+    start_iso = _utc_iso_minus_minutes(offset_from_minutes)
+    end_iso = _utc_iso_minus_minutes(offset_to_minutes)
+    sql = """
+    SELECT
+        node_url,
+        COUNT(*)                                          AS total,
+        SUM(success)                                      AS ok,
+        COUNT(*) - SUM(success)                           AS errors,
+        AVG(CASE WHEN success=1 THEN latency_ms END)      AS avg_latency_ms
+      FROM measurements
+     WHERE timestamp >= ?
+       AND timestamp <  ?
+     GROUP BY node_url
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (start_iso, end_iso)).fetchall()
+    out = []
+    for r in rows:
+        total = int(r["total"] or 0)
+        ok = int(r["ok"] or 0)
+        out.append({
+            "node_url": r["node_url"],
+            "total": total,
+            "ok": ok,
+            "errors": int(r["errors"] or 0),
+            "avg_latency_ms": round(r["avg_latency_ms"], 1) if r["avg_latency_ms"] is not None else None,
+            "uptime_pct": round(100.0 * ok / total, 2) if total else 0.0,
+        })
+    return out
+
+
 def get_uptime_daily(
     node_url: str,
     days: int,
@@ -352,20 +450,19 @@ def get_uptime_daily(
     `{ok: 0, total: 0, uptime_pct: null}` so the frontend calendar
     always has a contiguous date range to render.
     """
-    cutoff_iso = _utcnow_iso()
-    delta = f"-{int(days)} days"
+    cutoff_iso = _utc_iso_minus_minutes(int(days) * 24 * 60)
     sql = """
     SELECT date(timestamp) AS day,
            COUNT(*)        AS total,
            SUM(success)    AS ok
       FROM measurements
      WHERE node_url = ?
-       AND timestamp >= datetime(?, ?)
+       AND timestamp >= ?
      GROUP BY day
      ORDER BY day
     """
     with connect(db_path) as conn:
-        rows = conn.execute(sql, (node_url, cutoff_iso, delta)).fetchall()
+        rows = conn.execute(sql, (node_url, cutoff_iso)).fetchall()
     out = []
     for r in rows:
         total = int(r["total"] or 0)
@@ -389,8 +486,7 @@ def get_per_node_aggregates(
     error count per node. Anything needing higher-order stats (percentiles,
     outage lists) is done in Python on top of `get_measurements_range`.
     """
-    cutoff_iso = _utcnow_iso()
-    delta = f"-{int(lookback_minutes)} minutes"
+    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
     sql = """
     SELECT
         node_url,
@@ -399,11 +495,11 @@ def get_per_node_aggregates(
         COUNT(*) - SUM(success) AS errors,
         AVG(CASE WHEN success=1 THEN latency_ms END) AS avg_latency_ms
       FROM measurements
-     WHERE timestamp >= datetime(?, ?)
+     WHERE timestamp >= ?
      GROUP BY node_url
     """
     with connect(db_path) as conn:
-        rows = conn.execute(sql, (cutoff_iso, delta)).fetchall()
+        rows = conn.execute(sql, (cutoff_iso,)).fetchall()
     out = []
     for r in rows:
         total = int(r["total"] or 0)

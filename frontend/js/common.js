@@ -67,8 +67,26 @@
     return `${h}h ${m}m`;
   };
 
+  // Auto-run on DOMContentLoaded: append the dev `?api=` override to any
+  // header nav link so in-app navigation keeps pointing at the local API.
+  function decorateNavLinks() {
+    const override = API_BASE;
+    if (!override) return;
+    document.querySelectorAll('.nav-links a').forEach(a => {
+      const u = new URL(a.getAttribute('href'), window.location.href);
+      u.searchParams.set('api', override);
+      a.setAttribute('href', u.pathname + u.search);
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', decorateNavLinks);
+  } else {
+    decorateNavLinks();
+  }
+
   window.SteemAPI = {
     API_BASE, el, getJson, showError, clearError,
     preserveApiOverride, fmtLatency, fmtPct, fmtDuration,
+    decorateNavLinks,
   };
 })();

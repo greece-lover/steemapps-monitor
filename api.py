@@ -340,13 +340,67 @@ def build_app() -> FastAPI:
         if metric == "latency":
             enriched = [e for e in enriched if e["avg_latency_ms"] is not None]
             enriched.sort(key=lambda e: e["avg_latency_ms"])
+        elif metric == "latency_worst":
+            enriched = [e for e in enriched if e["avg_latency_ms"] is not None]
+            enriched.sort(key=lambda e: e["avg_latency_ms"], reverse=True)
         elif metric == "uptime":
             enriched.sort(key=lambda e: e["uptime_pct"], reverse=True)
+        elif metric == "uptime_worst":
+            enriched.sort(key=lambda e: e["uptime_pct"])
         elif metric == "errors":
             enriched.sort(key=lambda e: e["errors"], reverse=True)
         else:
-            raise HTTPException(status_code=400, detail="metric must be latency|uptime|errors")
+            raise HTTPException(status_code=400, detail="metric must be latency|latency_worst|uptime|uptime_worst|errors")
         return enriched
+
+    @ttl_cache(60)
+    def _chain_availability(lookback_minutes: int, bucket_seconds: int, db_path_key: str) -> list[dict]:
+        return database.get_chain_availability(lookback_minutes, bucket_seconds, db_path=db_path_key)
+
+    @ttl_cache(60)
+    def _daily_comparison(db_path_key: str) -> dict:
+        """Compare three past windows, each 24 h wide.
+
+        - today     : last 24 h                                       (offset   0 ..  24 h)
+        - yesterday : 24 h–48 h ago                                   (offset  24 h ..  48 h)
+        - lastweek  : the same 24 h slice exactly one week earlier    (offset 168 h .. 192 h)
+        """
+        regions = {n["url"]: n.get("region") for n in config.load_nodes()}
+        today = database.get_per_node_aggregates(24 * 60, db_path=db_path_key)
+        yday = database.get_per_node_aggregates_between(48 * 60, 24 * 60, db_path=db_path_key)
+        lastweek = database.get_per_node_aggregates_between(192 * 60, 168 * 60, db_path=db_path_key)
+
+        def index(xs):
+            return {x["node_url"]: x for x in xs}
+
+        it = index(today)
+        iy = index(yday)
+        il = index(lastweek)
+        out = []
+        for url, region in regions.items():
+            t = it.get(url, {})
+            y = iy.get(url, {})
+            l = il.get(url, {})
+            out.append({
+                "node_url": url,
+                "region": region,
+                "today": {
+                    "avg_latency_ms": t.get("avg_latency_ms"),
+                    "uptime_pct": t.get("uptime_pct", 0.0),
+                    "total": t.get("total", 0),
+                },
+                "yesterday": {
+                    "avg_latency_ms": y.get("avg_latency_ms"),
+                    "uptime_pct": y.get("uptime_pct", 0.0),
+                    "total": y.get("total", 0),
+                },
+                "lastweek": {
+                    "avg_latency_ms": l.get("avg_latency_ms"),
+                    "uptime_pct": l.get("uptime_pct", 0.0),
+                    "total": l.get("total", 0),
+                },
+            })
+        return {"nodes": out}
 
     def _validate_node(url: str) -> None:
         known = {n["url"] for n in config.load_nodes()}
@@ -449,11 +503,11 @@ def build_app() -> FastAPI:
 
     @app.get("/api/v1/stats/top")
     def stats_top(
-        metric: str = Query("latency", pattern="^(latency|uptime|errors)$"),
+        metric: str = Query("latency", pattern="^(latency|latency_worst|uptime|uptime_worst|errors)$"),
         limit: int = Query(10, ge=1, le=50),
         range: str = Query("24h", pattern="^(24h|7d|30d)$"),
     ) -> dict:
-        """Top-N ranking by latency (asc), uptime (desc) or errors (desc)."""
+        """Top-N ranking by latency, uptime, errors. `latency_worst` / `uptime_worst` reverse the sort."""
         minutes = _range_minutes(range)
         ranked = _rankings(metric, minutes, str(database.DB_PATH))
         return {
@@ -462,6 +516,32 @@ def build_app() -> FastAPI:
             "limit": limit,
             "generated_at": _utcnow_iso(),
             "ranked": ranked[:limit],
+        }
+
+    @app.get("/api/v1/stats/chain-availability")
+    def stats_chain_availability(range: str = Query("24h", pattern="^(24h|7d)$")) -> dict:
+        """Fleet-wide up/down counts bucketed over time.
+
+        24 h window uses 10-minute buckets (144 points). 7 d window uses
+        60-minute buckets (168 points). Both stay comfortably under the
+        `maxTicksLimit` Chart.js renders on a time axis."""
+        minutes = _range_minutes(range)
+        bucket_seconds = 600 if range == "24h" else 3600
+        points = _chain_availability(minutes, bucket_seconds, str(database.DB_PATH))
+        return {
+            "range": range,
+            "bucket_seconds": bucket_seconds,
+            "generated_at": _utcnow_iso(),
+            "points": points,
+        }
+
+    @app.get("/api/v1/stats/daily-comparison")
+    def stats_daily_comparison() -> dict:
+        """Per-node today / yesterday / same slice last week."""
+        data = _daily_comparison(str(database.DB_PATH))
+        return {
+            "generated_at": _utcnow_iso(),
+            **data,
         }
 
     return app

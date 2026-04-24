@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Statistics · Steem API Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="site-inner">
+    <div class="brand">
+      <a href="index.html" class="back-link" id="back-link">← Overview</a>
+      <div class="brand-text">
+        <div class="brand-title">Statistics</div>
+        <div class="brand-tagline">Fleet-wide aggregates, rankings and trends.</div>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html" id="nav-overview">Overview</a>
+      <a href="stats.html" class="active">Stats</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Rankings -->
+  <section class="stats-section">
+    <div class="section-head">
+      <h2 class="section-title">Rankings</h2>
+      <div class="range-toggle" id="ranking-range" role="tablist" aria-label="ranking range">
+        <button type="button" data-range="24h" class="active">24h</button>
+        <button type="button" data-range="7d">7d</button>
+        <button type="button" data-range="30d">30d</button>
+      </div>
+    </div>
+    <div class="rankings-grid">
+      <div class="ranking-card" id="card-fastest">
+        <h3>Fastest</h3>
+        <p class="card-sub">Lowest average latency</p>
+        <ol class="ranking-list"><li class="loading">Loading…</li></ol>
+      </div>
+      <div class="ranking-card" id="card-slowest">
+        <h3>Slowest</h3>
+        <p class="card-sub">Highest average latency</p>
+        <ol class="ranking-list"><li class="loading">Loading…</li></ol>
+      </div>
+      <div class="ranking-card" id="card-best-uptime">
+        <h3>Best uptime</h3>
+        <p class="card-sub">Most available</p>
+        <ol class="ranking-list"><li class="loading">Loading…</li></ol>
+      </div>
+      <div class="ranking-card" id="card-worst-uptime">
+        <h3>Worst uptime</h3>
+        <p class="card-sub">Least available</p>
+        <ol class="ranking-list"><li class="loading">Loading…</li></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chain availability -->
+  <section class="stats-section">
+    <div class="section-head">
+      <h2 class="section-title">Chain availability over time</h2>
+      <div class="range-toggle" id="availability-range" role="tablist">
+        <button type="button" data-range="24h" class="active">24h</button>
+        <button type="button" data-range="7d">7d</button>
+      </div>
+    </div>
+    <p class="section-sub">How many nodes answered each tick. Stacked area: green = up, red = down. Scale is an absolute count.</p>
+    <div class="chart-wrap tall"><canvas id="availability-chart"></canvas></div>
+  </section>
+
+  <!-- Global latency -->
+  <section class="stats-section">
+    <div class="section-head">
+      <h2 class="section-title">Latency across all nodes</h2>
+      <div class="range-toggle" id="global-latency-range" role="tablist">
+        <button type="button" data-range="24h" class="active">24h</button>
+        <button type="button" data-range="7d">7d</button>
+      </div>
+    </div>
+    <p class="section-sub">All ten nodes overlaid. Dips at the same time across many lines hint at chain-side or global-infrastructure issues.</p>
+    <div class="chart-wrap tall"><canvas id="global-latency-chart"></canvas></div>
+    <div id="global-latency-legend" class="compare-legend"></div>
+  </section>
+
+  <!-- Biggest outages -->
+  <section class="stats-section">
+    <div class="section-head">
+      <h2 class="section-title">Biggest outages this week</h2>
+      <span class="section-sub" id="biggest-count">(loading…)</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="biggest-outages">
+        <thead>
+          <tr>
+            <th>Node</th><th>Start</th><th>End</th><th>Duration</th><th>Severity</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="6" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Daily comparison -->
+  <section class="stats-section">
+    <div class="section-head">
+      <h2 class="section-title">Day-over-day comparison</h2>
+      <span class="section-sub">Today vs. yesterday vs. same slice last week</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table compare-table" id="daily-comparison">
+        <thead>
+          <tr>
+            <th rowspan="2">Node</th>
+            <th colspan="3" class="group-head">Latency (avg ms)</th>
+            <th colspan="3" class="group-head">Uptime</th>
+          </tr>
+          <tr>
+            <th>Today</th><th>Yesterday</th><th>Last week</th>
+            <th>Today</th><th>Yesterday</th><th>Last week</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js" defer></script>
+<script src="js/common.js" defer></script>
+<script src="js/stats.js" defer></script>
+</body>
+</html>
