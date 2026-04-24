@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Databases (runtime data, never committed)
+*.sqlite
+*.sqlite3
+*.db
+data/
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Phase-1 forensic artefacts (kept locally for traceability, not committed)
+_probe_*
