@@ -45,6 +45,21 @@ METHODOLOGY_VERSION: str = "mv1"
 SOURCE_LOCATION: str = os.environ.get("STEEMAPPS_SOURCE_LOCATION", "contabo-de-1")
 
 
+# Approximate geographic centres for each region name used in nodes.json,
+# used by the /api/v1/regions endpoint and the regions.html map. Regions
+# without a real-world anchor (global / unknown) have `lat`=None — the
+# map skips them and the aggregate table still includes them.
+REGION_COORDINATES: dict[str, dict] = {
+    "us-east":    {"lat": 40.71,  "lng":  -74.01, "label": "US East"},
+    "us-west":    {"lat": 37.77,  "lng": -122.42, "label": "US West"},
+    "us-central": {"lat": 32.78,  "lng":  -96.80, "label": "US Central"},
+    "asia":       {"lat":  1.35,  "lng":  103.82, "label": "Asia"},
+    "eu-central": {"lat": 50.11,  "lng":    8.68, "label": "Europe Central"},
+    "global":     {"lat":  None,  "lng":    None, "label": "Global / CDN"},
+    "unknown":    {"lat":  None,  "lng":    None, "label": "Unknown"},
+}
+
+
 def load_nodes() -> list[dict]:
     """Read the node list from nodes.json.
 
