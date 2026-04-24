@@ -1,13 +1,13 @@
 # Public API
 
-*As of Phase 3, the endpoints listed under "Phase 3 (current)" are implemented and loopback-only on the author's VM. The richer schema below the fold ("Phase 4 (planned public surface)") remains the target for the public `api.steemapps.com` exposure.*
+*As of Phase 4, every endpoint under "Current (`/api/v1/`)" is implemented and backing the dashboard under `frontend/`. The VM is still development-only — the API binds to `127.0.0.1:8110` and the dashboard is served from a second VM-internal port during development. A public `api.steemapps.com` exposure on the production server is deferred to a later phase.*
 
-Base URL: `https://api.steemapps.com/` (Phase 4, planned).
-Development: `http://127.0.0.1:8110/` on the author's VM, loopback-only — no external access in Phase 3.
+Base URL: `https://api.steemapps.com/` (planned, later phase).
+Development: `http://127.0.0.1:8110/` on the author's VM, or `http://localhost:8110/` over an SSH tunnel from a workstation.
 
-All endpoints return JSON, are read-only, and require no authentication.
+All endpoints return JSON, are read-only, require no authentication, and allow cross-origin GET requests (permissive CORS — the surface is read-only and unauthenticated).
 
-## Phase 3 (current) — `/api/v1/` prefix
+## Current (`/api/v1/`)
 
 ### `GET /api/v1/health`
 
@@ -56,49 +56,56 @@ penalties the scoring algorithm applied — human-readable strings that
 correspond one-to-one with the rules in
 [MEASUREMENT-METHODOLOGY.md](MEASUREMENT-METHODOLOGY.md).
 
-### `GET /api/v1/nodes/{node_url}/history?hours=24`
+### `GET /api/v1/nodes/{node_url}/history?hours=1`
 
-Raw per-tick rows for one node. `node_url` is percent-encoded in the path
-(e.g. `https%3A%2F%2Fapi.steemit.com`). `hours` is capped at 168 (one
-week) in Phase 3.
+Lean time series for the dashboard sparkline. `node_url` is percent-encoded
+in the path (e.g. `https%3A%2F%2Fapi.steemit.com`). `hours` defaults to 1
+and is capped at 168 (one week). Points are in chronological order —
+oldest first — so a line chart plots naturally left-to-right.
 
 ```json
 {
   "node_url": "https://api.steemit.com",
-  "hours": 24,
+  "hours": 1,
   "methodology_version": "mv1",
-  "rows": [
-    {
-      "id": 123,
-      "timestamp": "2026-04-24T09:34:00Z",
-      "node_url": "https://api.steemit.com",
-      "success": 1,
-      "latency_ms": 523,
-      "block_height": 105471530,
-      "error_message": null,
-      "source_location": "contabo-de-1"
-    }
+  "points": [
+    { "ts": "2026-04-24T15:35:31Z", "latency_ms": 702, "success": true },
+    { "ts": "2026-04-24T15:36:31Z", "latency_ms": 658, "success": true },
+    { "ts": "2026-04-24T15:37:31Z", "latency_ms": null, "success": false }
   ]
 }
 ```
 
-## Phase 4 (planned public surface)
+`latency_ms` is `null` on failed ticks. Chart.js's `spanGaps: false` is
+the right rendering mode — a failed tick becomes a visible break in the
+line.
 
-## `GET /health`
+### `GET /api/v1/nodes/{node_url}/uptime?days=7`
 
-Monitor service liveness. Returns the monitor's own status, not the Steem nodes'.
+Success-rate over a wall-clock window.
 
 ```json
 {
-  "service": "steemapps-monitor",
-  "status": "ok",
-  "uptime_s": 3712,
-  "last_tick_ts": "2026-04-24T09:34:00Z",
-  "methodology_version": "mv1"
+  "node_url": "https://api.steemit.com",
+  "days": 7,
+  "total": 61,
+  "ok": 61,
+  "uptime_pct": 100.0
 }
 ```
 
-## `GET /nodes`
+`days` ∈ [1, 30]. `total` is the number of ticks in the window; `ok` is
+the subset that responded with a valid head block. Ticks where the node
+was unreachable still count toward `total` — that is the definition of
+uptime we use on the dashboard.
+
+## Planned (public surface on `api.steemapps.com`)
+
+Once the monitor is fronted by a reverse proxy on the production server, the
+following `/v2`-prefixed surface consolidates and renames today's
+endpoints so the public URL shapes match the concept doc.
+
+### `GET /nodes`
 
 List of all monitored nodes with their current status.
 
@@ -123,7 +130,7 @@ List of all monitored nodes with their current status.
 
 Possible `status` values: `ok`, `degraded`, `down`, `unknown`.
 
-## `GET /nodes/{id}/history`
+### `GET /nodes/{id}/history`
 
 Per-tick history for charts. Query params:
 
@@ -143,7 +150,7 @@ Per-tick history for charts. Query params:
 }
 ```
 
-## `GET /outages`
+### `GET /outages`
 
 Recent outages across all nodes. Query params:
 
@@ -165,7 +172,7 @@ Recent outages across all nodes. Query params:
 }
 ```
 
-## `GET /reports/daily/{date}`
+### `GET /reports/daily/{date}`
 
 A previously generated daily report for the given UTC date (`YYYY-MM-DD`). Contains the same numbers as the chain-written `custom_json` — this is a convenience endpoint for consumers who do not want to parse chain data.
 
