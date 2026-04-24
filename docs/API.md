@@ -1,11 +1,88 @@
 # Public API
 
-*Scaffolding document — the API is implemented in Phase 4. This file pins the schema early so external consumers can plan against it.*
+*As of Phase 3, the endpoints listed under "Phase 3 (current)" are implemented and loopback-only on the author's VM. The richer schema below the fold ("Phase 4 (planned public surface)") remains the target for the public `api.steemapps.com` exposure.*
 
-Base URL: `https://api.steemapps.com/` (production, later phase).
-Development: `http://REDACTED-IP:8110/` on the author's VM (non-public).
+Base URL: `https://api.steemapps.com/` (Phase 4, planned).
+Development: `http://127.0.0.1:8110/` on the author's VM, loopback-only — no external access in Phase 3.
 
 All endpoints return JSON, are read-only, and require no authentication.
+
+## Phase 3 (current) — `/api/v1/` prefix
+
+### `GET /api/v1/health`
+
+Monitor-process liveness. Not the nodes' status.
+
+```json
+{
+  "service": "steemapps-monitor",
+  "status": "ok",
+  "uptime_s": 3712,
+  "last_tick_ts": "2026-04-24T09:34:00Z",
+  "methodology_version": "mv1",
+  "now": "2026-04-24T09:34:18Z"
+}
+```
+
+### `GET /api/v1/status`
+
+Snapshot of every configured node: last-tick measurement plus the derived
+health score.
+
+```json
+{
+  "generated_at": "2026-04-24T09:34:00Z",
+  "methodology_version": "mv1",
+  "reference_block": 105471530,
+  "nodes": [
+    {
+      "url": "https://api.steemit.com",
+      "region": "us-east",
+      "status": "ok",
+      "score": 100,
+      "last_tick_ts": "2026-04-24T09:34:00Z",
+      "latency_ms": 523,
+      "block_height": 105471530,
+      "block_lag": 0,
+      "error_message": null,
+      "reasons": []
+    }
+  ]
+}
+```
+
+`status` ∈ {`ok`, `degraded`, `down`, `unknown`}. `reasons` lists the
+penalties the scoring algorithm applied — human-readable strings that
+correspond one-to-one with the rules in
+[MEASUREMENT-METHODOLOGY.md](MEASUREMENT-METHODOLOGY.md).
+
+### `GET /api/v1/nodes/{node_url}/history?hours=24`
+
+Raw per-tick rows for one node. `node_url` is percent-encoded in the path
+(e.g. `https%3A%2F%2Fapi.steemit.com`). `hours` is capped at 168 (one
+week) in Phase 3.
+
+```json
+{
+  "node_url": "https://api.steemit.com",
+  "hours": 24,
+  "methodology_version": "mv1",
+  "rows": [
+    {
+      "id": 123,
+      "timestamp": "2026-04-24T09:34:00Z",
+      "node_url": "https://api.steemit.com",
+      "success": 1,
+      "latency_ms": 523,
+      "block_height": 105471530,
+      "error_message": null,
+      "source_location": "contabo-de-1"
+    }
+  ]
+}
+```
+
+## Phase 4 (planned public surface)
 
 ## `GET /health`
 

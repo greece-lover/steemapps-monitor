@@ -36,9 +36,15 @@ Der Monitor ist ein einziger Python-Prozess; zusätzliche Komponenten (API-Serve
 
 | Prozess | Unit-Name | Frequenz | Zweck |
 |---|---|---|---|
-| Monitor | `steemapps-monitor.service` | kontinuierlich | alle Nodes alle 60 s abfragen, Messungen schreiben |
-| API-Server | `steemapps-api.service` | kontinuierlich | Nur-Lese-JSON-Endpoints bereitstellen |
-| Daily-Reporter | Cron `@daily 02:00` | einmal täglich | aggregieren, auf Steemit posten, custom_json schreiben |
+| Monitor + API | `steemapps-monitor.service` | kontinuierlich | alle Nodes alle 60 s abfragen, Messungen schreiben, Nur-Lese-JSON bereitstellen (Phase 3: ein Prozess) |
+| Daily-Reporter | Cron `@daily 02:00` | einmal täglich | aggregieren, auf Steemit posten, custom_json schreiben (Phase 5+) |
+
+Phase 3 lässt Poller und FastAPI-Oberfläche im selben asyncio-Event-Loop
+innerhalb einer einzigen systemd-Unit laufen. Das hält die Deployment-
+Story minimal, solange das Projekt intern ist, und sorgt dafür, dass die
+API jede Zeile sieht, die der Poller eben geschrieben hat — ohne
+Inter-Prozess-Koordination. Phase 4 trennt beide, wenn nginx die API
+öffentlich davorsetzt.
 
 ## Datenverzeichnisse
 
@@ -87,3 +93,22 @@ Zwei Artefakte pro Tag:
 - Neue Nodes: eine Zeile in der `nodes`-Tabelle, Konfigurations-Reload triggert den Poller.
 - Neue Metriken: additiv — alte Zeilen haben für neue Spalten einfach `NULL`.
 - Neue Aggregations-Fenster: im Reporter umgesetzt, benötigen keine Schema-Änderungen.
+
+## Modul-Layout (Phase 3)
+
+Flaches Layout im Repo-Root — noch kein Package-Wrapper, weil die Modul-
+Menge klein und stabil ist. Der Wechsel zu einem Package ist ein Rename
++ Import-Pfad-Anpassung, falls der Codebase wächst.
+
+| Datei | Zuständigkeit |
+|---|---|
+| `monitor.py` | Entry-Point: startet die asynchrone Poll-Schleife + eingebettetes uvicorn |
+| `api.py` | FastAPI-App, baut auf `database` und `scoring` auf |
+| `database.py` | SQLite-Zugriff + Schema-Init + `Measurement`-Dataclass |
+| `scoring.py` | reine Score-Berechnung (keine I/O) |
+| `config.py` | Pfade, Intervalle, Node-Liste-Loader |
+| `logger.py` | stdout-Logging, passend für systemd-Journal |
+| `nodes.json` | die initialen vier Nodes; einzige Wahrheitsquelle |
+| `deploy/steemapps-monitor.service` | systemd-Unit |
+| `tests/` | pytest-Suite (`test_scoring.py`, `test_database.py`) |
+

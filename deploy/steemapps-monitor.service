@@ -1,0 +1,40 @@
+[Unit]
+Description=steemapps.com Steem API node monitor (Phase 3)
+Documentation=https://github.com/greece-lover/steemapps-monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=holger
+Group=holger
+WorkingDirectory=/opt/steemapps-monitor
+ExecStart=/opt/steemapps-monitor/.venv/bin/python /opt/steemapps-monitor/monitor.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening — the monitor is a read-only network client and a small
+# SQLite writer. It has no legitimate reason to touch the rest of the
+# filesystem or spawn sub-processes.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/steemapps-monitor/data /opt/steemapps-monitor/logs
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+# Phase-3-only constraint: the FastAPI surface is on 127.0.0.1, no need
+# for IPv6 or raw sockets. This is belt-and-braces alongside the in-app
+# loopback bind.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

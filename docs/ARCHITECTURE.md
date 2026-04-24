@@ -36,9 +36,14 @@ The monitor is a single Python process; additional components (API server, daily
 
 | Process | Unit name | Frequency | Purpose |
 |---|---|---|---|
-| Monitor | `steemapps-monitor.service` | continuous | poll all nodes every 60 s, write measurements |
-| API server | `steemapps-api.service` | continuous | serve read-only JSON endpoints |
-| Daily reporter | cron `@daily 02:00` | once a day | aggregate, post to Steemit, write custom_json |
+| Monitor + API | `steemapps-monitor.service` | continuous | poll all nodes every 60 s, write measurements, serve read-only JSON (Phase 3: single process) |
+| Daily reporter | cron `@daily 02:00` | once a day | aggregate, post to Steemit, write custom_json (Phase 5+) |
+
+Phase 3 runs the poller and the FastAPI surface inside one asyncio event
+loop in a single systemd unit. That keeps the deployment story minimal
+while the project is still internal, and makes the API see every row the
+poller wrote without any cross-process coordination. Phase 4 will split
+them apart when nginx fronts the API publicly.
 
 ## Data directories
 
@@ -87,3 +92,22 @@ Two artefacts per day:
 - New nodes: one row in the `nodes` table, configuration reload triggers the poller.
 - New metrics: additive — old rows simply have `NULL` for new columns.
 - New aggregation windows: handled in the reporter, does not require schema changes.
+
+## Module layout (Phase 3)
+
+Flat layout at repo root — no package wrapping yet, because the module set
+is small and stable. Moving to a package is a rename + import-path change
+if the codebase grows enough to warrant it.
+
+| File | Responsibility |
+|---|---|
+| `monitor.py` | entry point: starts the async poll loop + embedded uvicorn |
+| `api.py` | FastAPI app, builds on `database` and `scoring` |
+| `database.py` | SQLite access + schema init + `Measurement` dataclass |
+| `scoring.py` | pure score computation (no I/O) |
+| `config.py` | paths, intervals, node list loader |
+| `logger.py` | stdout logging configured for systemd-journal |
+| `nodes.json` | the initial four nodes; single source of truth |
+| `deploy/steemapps-monitor.service` | systemd unit |
+| `tests/` | pytest suite (`test_scoring.py`, `test_database.py`) |
+

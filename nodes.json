@@ -1,0 +1,6 @@
+[
+  {"url": "https://api.steemit.com",  "region": "us-east"},
+  {"url": "https://api.justyy.com",   "region": "us-west"},
+  {"url": "https://api.steem.fans",   "region": "asia"},
+  {"url": "https://api.steemyy.com",  "region": "unknown"}
+]
