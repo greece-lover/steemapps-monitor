@@ -336,6 +336,77 @@ def test_chain_availability_rejects_30d(app_and_db):
 #  /stats/daily-comparison
 # =============================================================================
 
+def test_outages_filter_by_min_duration(app_and_db):
+    client, db = app_and_db
+    base = datetime.now(timezone.utc) - timedelta(hours=1)
+    # Node A: one short outage (60 s), one real outage (300 s).
+    _insert(db, base + timedelta(seconds=0), NODE_A, ok=True)
+    _insert(db, base + timedelta(seconds=60), NODE_A, ok=False)
+    _insert(db, base + timedelta(seconds=120), NODE_A, ok=True)
+    for i in range(5):
+        _insert(db, base + timedelta(seconds=180 + i * 60), NODE_A, ok=False)
+    _insert(db, base + timedelta(seconds=480), NODE_A, ok=True)
+
+    r = client.get("/api/v1/outages?range=24h&min_duration_s=120")
+    assert r.status_code == 200
+    body = r.json()
+    # Only the 300-s outage passes a 120-s threshold.
+    assert body["min_duration_s"] == 120
+    assert body["total"] == 1
+    assert body["outages"][0]["severity"] == "real"
+    assert body["outages"][0]["duration_s"] == 300
+
+
+def test_outages_min_duration_validation(app_and_db):
+    client, _ = app_and_db
+    r = client.get("/api/v1/outages?min_duration_s=-1")
+    assert r.status_code == 422
+    r = client.get("/api/v1/outages?min_duration_s=86401")
+    assert r.status_code == 422
+
+
+def test_export_outages_csv_sets_attachment_and_escapes(app_and_db):
+    client, db = app_and_db
+    base = datetime.now(timezone.utc) - timedelta(hours=1)
+    _insert(db, base + timedelta(seconds=0), NODE_A, ok=True)
+    for i in range(3):
+        _insert(db, base + timedelta(seconds=60 + i * 60), NODE_A, ok=False)
+    _insert(db, base + timedelta(seconds=240), NODE_A, ok=True)
+
+    r = client.get("/api/v1/export/outages.csv?range=24h")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert 'attachment; filename="outages-24h.csv"' in r.headers["content-disposition"]
+    body = r.text.splitlines()
+    assert body[0] == "node_url,start,end,duration_s,severity,error_sample,ongoing"
+    assert len(body) == 2  # header + 1 outage
+    # 3 × 60 s = 180 s ⇒ severity real.
+    assert ",real," in body[1]
+    assert body[1].startswith(f"{NODE_A},")
+
+
+def test_export_outages_json_sets_attachment_and_filters(app_and_db):
+    client, db = app_and_db
+    base = datetime.now(timezone.utc) - timedelta(hours=1)
+    # One real outage, one short.
+    _insert(db, base + timedelta(seconds=0), NODE_A, ok=True)
+    _insert(db, base + timedelta(seconds=60), NODE_A, ok=False)
+    _insert(db, base + timedelta(seconds=120), NODE_A, ok=True)
+    for i in range(4):
+        _insert(db, base + timedelta(seconds=180 + i * 60), NODE_A, ok=False)
+    _insert(db, base + timedelta(seconds=420), NODE_A, ok=True)
+
+    r = client.get("/api/v1/export/outages.json?range=24h&severity=real")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/json")
+    assert 'attachment; filename="outages-24h-real.json"' in r.headers["content-disposition"]
+    import json as _json
+    body = _json.loads(r.text)
+    assert body["severity_filter"] == "real"
+    assert body["total"] == 1
+    assert body["outages"][0]["severity"] == "real"
+
+
 def test_regions_aggregates_by_region(app_and_db):
     client, db = app_and_db
     now = datetime.now(timezone.utc)

@@ -22,6 +22,7 @@ from urllib.parse import unquote
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
 import config
 import database
@@ -49,7 +50,12 @@ def _reference_block(latest_by_node: dict[str, dict]) -> Optional[int]:
 
 # --- Phase 6 helpers --------------------------------------------------------
 
-_RANGE_TO_MINUTES = {"24h": 24 * 60, "7d": 7 * 24 * 60, "30d": 30 * 24 * 60}
+_RANGE_TO_MINUTES = {
+    "24h": 24 * 60,
+    "7d":  7 * 24 * 60,
+    "30d": 30 * 24 * 60,
+    "90d": 90 * 24 * 60,
+}
 
 
 def _range_minutes(range_str: str) -> int:
@@ -425,7 +431,7 @@ def build_app() -> FastAPI:
     @app.get("/api/v1/nodes/{node_url:path}/outages")
     def node_outages(
         node_url: str,
-        range: str = Query("7d", pattern="^(24h|7d|30d)$"),
+        range: str = Query("7d", pattern="^(24h|7d|30d|90d)$"),
         limit: int = Query(100, ge=1, le=500),
         severity: Optional[str] = Query(None, pattern="^(short|real)$"),
     ) -> dict:
@@ -447,27 +453,44 @@ def build_app() -> FastAPI:
             "outages": outages,
         }
 
-    @app.get("/api/v1/outages")
-    def outages_global(
-        range: str = Query("7d", pattern="^(24h|7d|30d)$"),
-        node: Optional[str] = None,
-        severity: Optional[str] = Query(None, pattern="^(short|real)$"),
-        limit: int = Query(100, ge=1, le=1000),
-    ) -> dict:
-        """Outages across every node. Filter by node, severity, window."""
-        minutes = _range_minutes(range)
+    def _filtered_global_outages(
+        range_str: str,
+        node: Optional[str],
+        severity: Optional[str],
+        min_duration_s: int,
+    ) -> list[dict]:
+        """Shared filter pipeline for /outages and the export endpoints.
+        Exposed as a helper so CSV/JSON exports reuse the exact same
+        result set the UI sees."""
+        minutes = _range_minutes(range_str)
         outages = _global_outages(minutes, str(database.DB_PATH))
         if node:
             _validate_node(node)
             outages = [o for o in outages if o["node_url"] == node]
         if severity:
             outages = [o for o in outages if o["severity"] == severity]
+        if min_duration_s > 0:
+            outages = [o for o in outages if o["duration_s"] >= min_duration_s]
+        return outages
+
+    @app.get("/api/v1/outages")
+    def outages_global(
+        range: str = Query("7d", pattern="^(24h|7d|30d|90d)$"),
+        node: Optional[str] = None,
+        severity: Optional[str] = Query(None, pattern="^(short|real)$"),
+        min_duration_s: int = Query(0, ge=0, le=86400),
+        limit: int = Query(100, ge=1, le=5000),
+    ) -> dict:
+        """Outages across every node. Filter by node, severity, window, duration."""
+        outages = _filtered_global_outages(range, node, severity, min_duration_s)
         return {
             "range": range,
             "node_filter": node,
             "severity_filter": severity,
+            "min_duration_s": min_duration_s,
             "severity_threshold_s": database.OUTAGE_SEVERITY_THRESHOLD_S,
             "generated_at": _utcnow_iso(),
+            "total": len(outages),
             "outages": outages[:limit],
         }
 
@@ -501,11 +524,97 @@ def build_app() -> FastAPI:
             "uptime": data,
         }
 
+    # ------------------------------------------------------------------ #
+    #  CSV / JSON export of the outage log.                              #
+    # ------------------------------------------------------------------ #
+
+    def _outages_csv(outages: list[dict]) -> str:
+        """Render the outage list as a minimal RFC 4180 CSV.
+
+        Rolling our own writer keeps us dependency-free; the field set
+        is small enough that we don't need the escaping logic of the
+        stdlib csv module for anything beyond a double-quote rewrite.
+        """
+        def esc(v):
+            if v is None:
+                return ""
+            s = str(v)
+            if '"' in s or ',' in s or '\n' in s:
+                return '"' + s.replace('"', '""') + '"'
+            return s
+        header = "node_url,start,end,duration_s,severity,error_sample,ongoing\n"
+        rows = []
+        for o in outages:
+            rows.append(",".join([
+                esc(o.get("node_url", "")),
+                esc(o["start"]),
+                esc(o["end"]),
+                esc(o["duration_s"]),
+                esc(o["severity"]),
+                esc(o.get("error_sample")),
+                esc("true" if o.get("ongoing") else "false"),
+            ]))
+        return header + "\n".join(rows) + ("\n" if rows else "")
+
+    @app.get("/api/v1/export/outages.csv")
+    def export_outages_csv(
+        range: str = Query("30d", pattern="^(24h|7d|30d|90d)$"),
+        node: Optional[str] = None,
+        severity: Optional[str] = Query(None, pattern="^(short|real)$"),
+        min_duration_s: int = Query(0, ge=0, le=86400),
+    ) -> Response:
+        """CSV download of the filtered outage log. Reuses the exact
+        filter pipeline of /api/v1/outages so what you download is what
+        you see on the page."""
+        outages = _filtered_global_outages(range, node, severity, min_duration_s)
+        body = _outages_csv(outages)
+        filename = f"outages-{range}"
+        if node: filename += f"-{node.replace('https://','').replace('/','_')}"
+        if severity: filename += f"-{severity}"
+        filename += ".csv"
+        return Response(
+            content=body,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.get("/api/v1/export/outages.json")
+    def export_outages_json(
+        range: str = Query("30d", pattern="^(24h|7d|30d|90d)$"),
+        node: Optional[str] = None,
+        severity: Optional[str] = Query(None, pattern="^(short|real)$"),
+        min_duration_s: int = Query(0, ge=0, le=86400),
+    ) -> Response:
+        """JSON download of the filtered outage log. Same filter
+        pipeline as the CSV export; only the Content-Disposition and
+        envelope differ."""
+        import json as _json
+        outages = _filtered_global_outages(range, node, severity, min_duration_s)
+        payload = {
+            "range": range,
+            "node_filter": node,
+            "severity_filter": severity,
+            "min_duration_s": min_duration_s,
+            "severity_threshold_s": database.OUTAGE_SEVERITY_THRESHOLD_S,
+            "generated_at": _utcnow_iso(),
+            "total": len(outages),
+            "outages": outages,
+        }
+        filename = f"outages-{range}"
+        if node: filename += f"-{node.replace('https://','').replace('/','_')}"
+        if severity: filename += f"-{severity}"
+        filename += ".json"
+        return Response(
+            content=_json.dumps(payload, indent=2),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
     @app.get("/api/v1/stats/top")
     def stats_top(
         metric: str = Query("latency", pattern="^(latency|latency_worst|uptime|uptime_worst|errors)$"),
         limit: int = Query(10, ge=1, le=50),
-        range: str = Query("24h", pattern="^(24h|7d|30d)$"),
+        range: str = Query("24h", pattern="^(24h|7d|30d|90d)$"),
     ) -> dict:
         """Top-N ranking by latency, uptime, errors. `latency_worst` / `uptime_worst` reverse the sort."""
         minutes = _range_minutes(range)

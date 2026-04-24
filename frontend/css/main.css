@@ -747,6 +747,19 @@ a.node-card:hover { border-color: var(--accent-dim); }
 .popup-lat { color: var(--text); }
 .popup-up  { color: var(--text-muted); }
 
+/* Outage-log export controls */
+.ctrl-export {
+  margin-left: auto;
+  gap: 6px;
+}
+.ctrl-export .share-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Status-pill in the regional aggregate table (smaller variant) */
 .status-pill.small {
   padding: 2px 8px;
