@@ -4,6 +4,9 @@
    breakpoint at 600 px collapses the node grid to a single column. */
 
 :root {
+  /* Dark theme — default. Identical to the palette shipped before the
+     theme switch landed, so a user without a stored preference keeps the
+     exact visual they already knew. */
   --bg:           #0a0a0a;
   --bg-raised:   #141414;
   --bg-card:     #181818;
@@ -21,12 +24,40 @@
   --status-down: #ef6a6a;
   --status-unknown: #4b4b4b;
 
+  --chart-grid:  #1e1e1e;
+  --chart-tick:  #8c8c8c;
+
   --radius:      10px;
   --radius-sm:   6px;
 
   --mono:        ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, monospace;
   --display:     "Fraunces", Georgia, serif;
   --body:        "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+[data-theme="light"] {
+  /* Light theme — picked for WCAG-AA on the body text and for accent
+     readability on white. The lime becomes olive (#5a7d0f) so it still
+     stands out against a paper background without losing brand feel. */
+  --bg:           #fafafa;
+  --bg-raised:   #ffffff;
+  --bg-card:     #ffffff;
+  --bg-card-hover: #f2f2f2;
+  --border:      #e2e2e2;
+  --text:        #1a1a1a;
+  --text-muted:  #555555;
+  --text-dim:    #8a8a8a;
+
+  --accent:      #5a7d0f;
+  --accent-dim:  #e4f0c9;
+
+  --status-ok:   #1f8a45;
+  --status-deg:  #bd8e1a;
+  --status-down: #c9443f;
+  --status-unknown: #b8b8b8;
+
+  --chart-grid:  #ececec;
+  --chart-tick:  #666666;
 }
 
 * { box-sizing: border-box; }
@@ -596,6 +627,29 @@ a.node-card:hover { border-color: var(--accent-dim); }
   gap: 10px;
 }
 
+/* Top-right toolbar: auto-refresh select + theme toggle. Identical on
+   every page so the controls "feel" like part of the browser chrome. */
+.toolbar {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-btn,
+.toolbar-select {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  min-height: 30px;
+}
+.toolbar-btn:hover,
+.toolbar-select:hover { color: var(--accent); border-color: var(--accent-dim); }
+.toolbar-select { padding: 4px 6px; }
+
 .nav-links {
   display: inline-flex;
   gap: 18px;
@@ -783,8 +837,19 @@ a.node-card:hover { border-color: var(--accent-dim); }
 
 /* ---------- Mobile ---------- */
 
-@media (max-width: 600px) {
-  .site-inner { padding: 20px 16px; }
+/* ---------- Tablet (≤ 768 px) ---------- */
+@media (max-width: 768px) {
+  .site-inner {
+    padding: 20px 16px;
+    /* Stack header vertically so the toolbar + nav always stay on one
+       line below the brand block. */
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .header-right {
+    width: 100%;
+    align-items: flex-start;
+  }
   .container { padding: 24px 16px 48px; }
   .meta { width: 100%; }
   .node-grid { grid-template-columns: 1fr; }
@@ -793,14 +858,77 @@ a.node-card:hover { border-color: var(--accent-dim); }
   .brand-title { font-size: 18px; }
   .brand-tagline { font-size: 12px; }
 
-  .controls { gap: 10px 14px; padding: 12px; }
+  .controls {
+    gap: 10px 14px;
+    padding: 12px;
+    /* Keep the control panel scannable — one row per ctrl becomes the
+       norm on tablet width. */
+  }
   .reset-btn { margin-left: 0; }
+  .ctrl-export { margin-left: 0; }
 
-  .uptime-calendar { grid-template-columns: repeat(10, 1fr); }
-  .chart-wrap.tall { height: 260px; }
+  .uptime-calendar { grid-template-columns: repeat(15, 1fr); }
+  .chart-wrap.tall { height: 280px; }
   .compare-picker { left: 0; right: auto; }
 
-  .rankings-grid { grid-template-columns: 1fr; }
-  .nav-links { gap: 12px; }
+  .rankings-grid { grid-template-columns: repeat(2, 1fr); }
+  .nav-links { gap: 12px; flex-wrap: wrap; }
   .compare-table { font-size: 12px; }
+
+  /* Touch-friendly tap targets on tablet + phone. */
+  .range-toggle button,
+  .toolbar-btn,
+  .share-btn,
+  .reset-btn,
+  .sort-dir,
+  .compare-toggle,
+  .ctrl-export a {
+    min-height: 40px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+/* ---------- Phone (≤ 480 px) ---------- */
+@media (max-width: 480px) {
+  .rankings-grid { grid-template-columns: 1fr; }
+  .uptime-calendar { grid-template-columns: repeat(10, 1fr); }
+  .chart-wrap.tall { height: 220px; }
+  .chart-wrap { height: 160px; }
+
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .brand-title { font-size: 16px; }
+
+  /* Collapsible filter panel: gets a details/summary-like affordance.
+     We do the actual toggle in JS on outages.html; this rule handles
+     the purely visual "compact on phone" side of things. */
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ctrl {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .ctrl select,
+  .ctrl input[type=range] {
+    width: 100%;
+  }
+
+  .data-table { font-size: 11px; }
+  .data-table thead th,
+  .data-table tbody td { padding: 8px 6px; }
+
+  .region-map { height: 340px; }
+
+  /* A touch larger on phones — Apple HIG recommends 44 px minimum. */
+  .range-toggle button,
+  .toolbar-btn,
+  .share-btn,
+  .reset-btn,
+  .sort-dir,
+  .compare-toggle,
+  .ctrl-export a {
+    min-height: 44px;
+  }
 }

@@ -408,7 +408,11 @@ def get_per_node_aggregates_between(
     if offset_from_minutes <= offset_to_minutes:
         raise ValueError("offset_from must be further in the past than offset_to")
     start_iso = _utc_iso_minus_minutes(offset_from_minutes)
-    end_iso = _utc_iso_minus_minutes(offset_to_minutes)
+    # When offset_to is 0 ("up to now"), nudging the upper bound 60 s into
+    # the future keeps the current tick in the window — otherwise the
+    # half-open interval `[start, end)` would exclude rows whose timestamp
+    # equals the "now" we compute here.
+    end_iso = _utc_iso_minus_minutes(offset_to_minutes - 1 if offset_to_minutes == 0 else offset_to_minutes)
     sql = """
     SELECT
         node_url,
@@ -480,36 +484,12 @@ def get_per_node_aggregates(
     lookback_minutes: int,
     db_path: Path | str = DB_PATH,
 ) -> list[dict]:
-    """Per-node avg/count summary within a window.
+    """Per-node avg/count summary within a window (now - lookback .. now).
 
-    One SQL pass produces avg_latency, success count, total count and
-    error count per node. Anything needing higher-order stats (percentiles,
-    outage lists) is done in Python on top of `get_measurements_range`.
-    """
-    cutoff_iso = _utc_iso_minus_minutes(lookback_minutes)
-    sql = """
-    SELECT
-        node_url,
-        COUNT(*) AS total,
-        SUM(success) AS ok,
-        COUNT(*) - SUM(success) AS errors,
-        AVG(CASE WHEN success=1 THEN latency_ms END) AS avg_latency_ms
-      FROM measurements
-     WHERE timestamp >= ?
-     GROUP BY node_url
-    """
-    with connect(db_path) as conn:
-        rows = conn.execute(sql, (cutoff_iso,)).fetchall()
-    out = []
-    for r in rows:
-        total = int(r["total"] or 0)
-        ok = int(r["ok"] or 0)
-        out.append({
-            "node_url": r["node_url"],
-            "total": total,
-            "ok": ok,
-            "errors": int(r["errors"] or 0),
-            "avg_latency_ms": round(r["avg_latency_ms"], 1) if r["avg_latency_ms"] is not None else None,
-            "uptime_pct": round(100.0 * ok / total, 2) if total else 0.0,
-        })
-    return out
+    Delegates to `get_per_node_aggregates_between` so both paths share
+    the same bounded-range SQL. That bounded form is ~100× faster at
+    1 M rows: with only a lower bound SQLite's planner picks the
+    `node_url` index and filter-scans all 1 M rows; with both bounds it
+    can range-seek the composite `(node_url, timestamp)` index. See
+    docs/PERFORMANCE.md for the numbers."""
+    return get_per_node_aggregates_between(lookback_minutes, 0, db_path=db_path)

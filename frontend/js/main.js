@@ -9,8 +9,7 @@
 // `?api=http://localhost:8110` to the page URL.
 
 (() => {
-  const { API_BASE, el, getJson, showError, clearError, fmtLatency, fmtPct } = window.SteemAPI;
-  const REFRESH_MS = 60_000;
+  const { API_BASE, el, getJson, showError, clearError, fmtLatency, fmtPct, onAutoRefresh, chartColors } = window.SteemAPI;
 
   // --- UI state: filters + sorting, round-tripped through the URL ---------
   // The `api` param is reserved for the local-dev override and is not
@@ -106,13 +105,14 @@
       existing.update('none');
       return;
     }
+    const c = chartColors();
     const chart = new Chart(canvas, {
       type: 'line',
       data: {
         labels,
         datasets: [{
           data: latencies,
-          borderColor: '#b7e34a',
+          borderColor: c.accent,
           borderWidth: 1.5,
           tension: 0.3,
           pointRadius: 0,
@@ -347,5 +347,8 @@
   bindControls();
   syncControlsFromState();
   refresh();
-  setInterval(refresh, REFRESH_MS);
+  // Auto-refresh is driven by the shared toolbar — the user's pace setting
+  // (live 10s / normal 60s / slow 5m / paused) lives in localStorage and
+  // propagates to every page via window.SteemAPI.onAutoRefresh.
+  onAutoRefresh(refresh);
 })();

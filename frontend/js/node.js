@@ -135,6 +135,7 @@
   let latencyChart = null;
   function renderLatencyChart(nodeDatasets, range) {
     const canvas = document.getElementById('latency-chart');
+    const c = window.SteemAPI.chartColors();
     // Align X axis: the primary's point timestamps are the X reference.
     // Chart.js does fine with mismatched lengths per dataset as long as
     // each dataset provides its own labels via {x, y} pairs.
@@ -173,13 +174,13 @@
           x: {
             type: 'time',
             time: { unit: range === '24h' ? 'hour' : 'day' },
-            ticks: { color: '#8c8c8c', maxTicksLimit: 8 },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, maxTicksLimit: 8 },
+            grid: { color: c.grid },
           },
           y: {
             beginAtZero: true,
-            ticks: { color: '#8c8c8c', callback: v => v + ' ms' },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, callback: v => v + ' ms' },
+            grid: { color: c.grid },
           },
         },
       },
@@ -268,6 +269,7 @@
   let blockLagChart = null;
   function renderBlockLagChart(points, range) {
     const canvas = document.getElementById('block-lag-chart');
+    const c = window.SteemAPI.chartColors();
     const data = points.map(p => ({ x: p.ts, y: p.block_lag }));
     if (blockLagChart) { blockLagChart.destroy(); blockLagChart = null; }
     blockLagChart = new Chart(canvas, {
@@ -276,8 +278,8 @@
         datasets: [{
           label: 'block_lag',
           data,
-          borderColor: '#e8c34a',
-          backgroundColor: '#e8c34a22',
+          borderColor: c.deg,
+          backgroundColor: c.deg + '22',
           borderWidth: 1.4,
           pointRadius: 0,
           tension: 0.25,
@@ -292,14 +294,14 @@
           x: {
             type: 'time',
             time: { unit: range === '24h' ? 'hour' : 'day' },
-            ticks: { color: '#8c8c8c', maxTicksLimit: 8 },
-            grid: { color: '#1e1e1e' },
+            ticks: { color: c.tick, maxTicksLimit: 8 },
+            grid: { color: c.grid },
           },
           y: {
             beginAtZero: true,
-            ticks: { color: '#8c8c8c', precision: 0 },
-            grid: { color: '#1e1e1e' },
-            title: { display: true, text: 'blocks behind', color: '#8c8c8c' },
+            ticks: { color: c.tick, precision: 0 },
+            grid: { color: c.grid },
+            title: { display: true, text: 'blocks behind', color: c.tick },
           },
         },
       },
