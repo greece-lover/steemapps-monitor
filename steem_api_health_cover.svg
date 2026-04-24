@@ -1,0 +1,92 @@
+<svg viewBox="0 0 1920 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cover-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0b0d"/>
+      <stop offset="50%" stop-color="#15181e"/>
+      <stop offset="100%" stop-color="#1a1e26"/>
+    </linearGradient>
+    <pattern id="cover-grid" x="0" y="0" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="rgba(196,245,66,0.04)" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="fade-right" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#c4f542" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#c4f542" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#c4f542" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="glow-cover">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="500" fill="url(#cover-bg)"/>
+  <rect width="1920" height="500" fill="url(#cover-grid)"/>
+
+  <!-- Subtle sparkline backdrop (data visualization feel) -->
+  <g opacity="0.15" transform="translate(0, 380)">
+    <path d="M 0,40 L 80,35 L 160,50 L 240,20 L 320,45 L 400,15 L 480,50 L 560,25 L 640,40 L 720,10 L 800,35 L 880,20 L 960,45 L 1040,15 L 1120,30 L 1200,5 L 1280,40 L 1360,20 L 1440,35 L 1520,10 L 1600,25 L 1680,45 L 1760,15 L 1840,30 L 1920,20"
+          fill="none" stroke="#c4f542" stroke-width="1.5"/>
+  </g>
+
+  <g opacity="0.08" transform="translate(0, 420)">
+    <path d="M 0,30 L 80,45 L 160,25 L 240,50 L 320,15 L 400,40 L 480,20 L 560,45 L 640,10 L 720,35 L 800,25 L 880,50 L 960,15 L 1040,40 L 1120,20 L 1200,35 L 1280,10 L 1360,45 L 1440,25 L 1520,40 L 1600,15 L 1680,30 L 1760,45 L 1840,20 L 1920,35"
+          fill="none" stroke="#c4f542" stroke-width="1.5"/>
+  </g>
+
+  <!-- Left: Status indicators -->
+  <g transform="translate(80, 120)">
+    <circle cx="0" cy="0" r="8" fill="#4ade80">
+      <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <text x="20" y="5" fill="#e8e9eb" font-family="monospace" font-size="14" letter-spacing="2">MONITORING ACTIVE</text>
+
+    <circle cx="0" cy="35" r="4" fill="#c4f542"/>
+    <text x="20" y="40" fill="rgba(255,255,255,0.5)" font-family="monospace" font-size="12" letter-spacing="1">10 NODES TRACKED</text>
+
+    <circle cx="0" cy="60" r="4" fill="#c4f542"/>
+    <text x="20" y="65" fill="rgba(255,255,255,0.5)" font-family="monospace" font-size="12" letter-spacing="1">60s INTERVAL</text>
+  </g>
+
+  <!-- Center: Main title -->
+  <g transform="translate(960, 250)" text-anchor="middle">
+    <text y="-30" fill="rgba(196,245,66,0.6)" font-family="monospace" font-size="14" letter-spacing="8">STEEM API HEALTH</text>
+
+    <text y="20" fill="#e8e9eb" font-family="Georgia, serif" font-size="52" font-weight="500" font-style="italic" letter-spacing="-1">
+      Automated monitoring of Steem API nodes
+    </text>
+
+    <text y="65" fill="rgba(255,255,255,0.4)" font-family="monospace" font-size="14" letter-spacing="3">
+      Daily uptime reports  ·  Latency metrics  ·  Open data
+    </text>
+  </g>
+
+  <!-- Central pulse line -->
+  <g transform="translate(750, 330)" filter="url(#glow-cover)">
+    <path d="M 0,0 L 60,0 L 80,-25 L 110,25 L 140,-40 L 170,40 L 200,-20 L 230,0 L 420,0"
+          fill="none"
+          stroke="#c4f542"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          opacity="0.8"/>
+  </g>
+
+  <!-- Right: Technical details -->
+  <g transform="translate(1740, 120)" text-anchor="end">
+    <text y="0" fill="rgba(196,245,66,0.6)" font-family="monospace" font-size="11" letter-spacing="2">DASHBOARD</text>
+    <text y="20" fill="#e8e9eb" font-family="monospace" font-size="14">api.steemapps.com</text>
+
+    <text y="55" fill="rgba(196,245,66,0.6)" font-family="monospace" font-size="11" letter-spacing="2">METHODOLOGY</text>
+    <text y="75" fill="#e8e9eb" font-family="monospace" font-size="14">mv1 · open source</text>
+
+    <text y="110" fill="rgba(196,245,66,0.6)" font-family="monospace" font-size="11" letter-spacing="2">OPERATED BY</text>
+    <text y="130" fill="#e8e9eb" font-family="monospace" font-size="14">@greece-lover</text>
+  </g>
+
+  <!-- Bottom line -->
+  <rect x="0" y="498" width="1920" height="2" fill="url(#fade-right)"/>
+</svg>
