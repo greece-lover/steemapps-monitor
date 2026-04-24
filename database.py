@@ -211,3 +211,170 @@ def row_count(db_path: Path | str = DB_PATH) -> int:
     with connect(db_path) as conn:
         row = conn.execute("SELECT COUNT(*) AS c FROM measurements").fetchone()
     return int(row["c"])
+
+
+# =============================================================================
+#  Phase 6 query helpers.
+# =============================================================================
+#
+# Everything below powers the expanded dashboard (node detail, stats, regions,
+# outages). These functions are read-only and idempotent; callers wrap them in
+# `ttl_cache` at the API layer.
+
+
+def get_measurements_range(
+    node_url: str,
+    lookback_minutes: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """All measurements for one node within a wall-clock window, chronological.
+
+    Covered by idx_measurements_node_ts — EXPLAIN QUERY PLAN confirms SEARCH
+    USING INDEX for any lookback. Returns the rows sorted oldest-first so the
+    outage detector and downsampler can iterate once.
+    """
+    cutoff_iso = _utcnow_iso()
+    delta = f"-{int(lookback_minutes)} minutes"
+    sql = """
+    SELECT timestamp, node_url, success, latency_ms, block_height, error_message
+      FROM measurements
+     WHERE node_url = ?
+       AND timestamp >= datetime(?, ?)
+     ORDER BY timestamp ASC
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (node_url, cutoff_iso, delta)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_all_measurements_range(
+    lookback_minutes: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """All measurements across every node within a window, chronological.
+
+    Used by /api/v1/outages (global) and /stats/top(errors). Sorted by
+    node_url first, then timestamp — the outage aggregator buckets by node
+    and then walks each bucket in time order.
+    """
+    cutoff_iso = _utcnow_iso()
+    delta = f"-{int(lookback_minutes)} minutes"
+    sql = """
+    SELECT timestamp, node_url, success, latency_ms, block_height, error_message
+      FROM measurements
+     WHERE timestamp >= datetime(?, ?)
+     ORDER BY node_url ASC, timestamp ASC
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (cutoff_iso, delta)).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ---------- Outage detection ------------------------------------------------
+
+# The 2-minute threshold separating a transient hiccup from a real outage is
+# fixed by the project's MEASUREMENT-METHODOLOGY concept doc. Exported so
+# tests and the report generator can reuse it without drifting.
+OUTAGE_SEVERITY_THRESHOLD_S = 120
+
+
+def compute_outages(
+    measurements: list[dict],
+    *,
+    now_iso: Optional[str] = None,
+    severity_threshold_s: int = OUTAGE_SEVERITY_THRESHOLD_S,
+) -> list[dict]:
+    """Collapse a chronologically-ordered run of measurements into outages.
+
+    An outage starts with the first `success=0` row and ends at the first
+    subsequent `success=1` row. If the run never recovers within the
+    supplied measurements, we treat the outage as ongoing and use `now_iso`
+    (or the current UTC second) as its end — so a node that is currently
+    down still shows a defined duration.
+
+    Each entry carries:
+
+    - start, end           : ISO timestamps (Z)
+    - duration_s           : integer seconds
+    - severity             : "short" (< threshold) or "real" (>= threshold)
+    - error_sample         : first non-null error_message inside the run
+    - ongoing              : True when the outage has no recovered row yet
+    """
+    outages: list[dict] = []
+    run_start: Optional[str] = None
+    run_error: Optional[str] = None
+
+    for m in measurements:
+        if not m["success"]:
+            if run_start is None:
+                run_start = m["timestamp"]
+            if run_error is None and m.get("error_message"):
+                run_error = m["error_message"]
+            continue
+        if run_start is not None:
+            outages.append(_make_outage(run_start, m["timestamp"], run_error, severity_threshold_s, ongoing=False))
+            run_start = None
+            run_error = None
+
+    if run_start is not None:
+        end = now_iso or _utcnow_iso()
+        outages.append(_make_outage(run_start, end, run_error, severity_threshold_s, ongoing=True))
+
+    return outages
+
+
+def _make_outage(start_iso: str, end_iso: str, error_sample: Optional[str], threshold_s: int, *, ongoing: bool) -> dict:
+    start_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+    end_dt = datetime.fromisoformat(end_iso.replace("Z", "+00:00"))
+    duration_s = max(0, int((end_dt - start_dt).total_seconds()))
+    return {
+        "start": start_iso,
+        "end": end_iso,
+        "duration_s": duration_s,
+        "severity": "real" if duration_s >= threshold_s else "short",
+        "error_sample": error_sample,
+        "ongoing": ongoing,
+    }
+
+
+# ---------- Per-node aggregates used by /stats/top --------------------------
+
+
+def get_per_node_aggregates(
+    lookback_minutes: int,
+    db_path: Path | str = DB_PATH,
+) -> list[dict]:
+    """Per-node avg/count summary within a window.
+
+    One SQL pass produces avg_latency, success count, total count and
+    error count per node. Anything needing higher-order stats (percentiles,
+    outage lists) is done in Python on top of `get_measurements_range`.
+    """
+    cutoff_iso = _utcnow_iso()
+    delta = f"-{int(lookback_minutes)} minutes"
+    sql = """
+    SELECT
+        node_url,
+        COUNT(*) AS total,
+        SUM(success) AS ok,
+        COUNT(*) - SUM(success) AS errors,
+        AVG(CASE WHEN success=1 THEN latency_ms END) AS avg_latency_ms
+      FROM measurements
+     WHERE timestamp >= datetime(?, ?)
+     GROUP BY node_url
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(sql, (cutoff_iso, delta)).fetchall()
+    out = []
+    for r in rows:
+        total = int(r["total"] or 0)
+        ok = int(r["ok"] or 0)
+        out.append({
+            "node_url": r["node_url"],
+            "total": total,
+            "ok": ok,
+            "errors": int(r["errors"] or 0),
+            "avg_latency_ms": round(r["avg_latency_ms"], 1) if r["avg_latency_ms"] is not None else None,
+            "uptime_pct": round(100.0 * ok / total, 2) if total else 0.0,
+        })
+    return out

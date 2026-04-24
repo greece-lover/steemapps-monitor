@@ -40,7 +40,48 @@
 
 <main class="container">
   <section aria-labelledby="nodes-heading">
-    <h2 id="nodes-heading" class="section-title">Nodes</h2>
+    <div class="section-head">
+      <h2 id="nodes-heading" class="section-title">Nodes</h2>
+      <div class="match-count" id="match-count" aria-live="polite"></div>
+    </div>
+
+    <div class="controls" id="controls">
+      <div class="ctrl">
+        <label for="f-region">Region</label>
+        <select id="f-region">
+          <option value="">all</option>
+        </select>
+      </div>
+
+      <div class="ctrl ctrl-status">
+        <span class="ctrl-label">Status</span>
+        <label><input type="checkbox" value="ok" checked> ok</label>
+        <label><input type="checkbox" value="warning" checked> warn</label>
+        <label><input type="checkbox" value="critical" checked> critical</label>
+        <label><input type="checkbox" value="down" checked> down</label>
+      </div>
+
+      <div class="ctrl">
+        <label for="f-score">Min score</label>
+        <input type="range" id="f-score" min="0" max="100" value="0" step="5">
+        <span id="f-score-val" class="score-val">0</span>
+      </div>
+
+      <div class="ctrl ctrl-sort">
+        <label for="f-sort">Sort by</label>
+        <select id="f-sort">
+          <option value="name">name</option>
+          <option value="region">region</option>
+          <option value="latency">latency</option>
+          <option value="score" selected>score</option>
+          <option value="status">status</option>
+        </select>
+        <button type="button" id="f-sort-dir" class="sort-dir" aria-label="toggle direction">↓</button>
+      </div>
+
+      <button type="button" id="f-reset" class="reset-btn">reset</button>
+    </div>
+
     <div id="nodes" class="node-grid">
       <p class="loading">Loading…</p>
     </div>

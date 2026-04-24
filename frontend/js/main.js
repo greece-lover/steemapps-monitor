@@ -13,6 +13,84 @@
   const API_BASE = (new URL(window.location.href).searchParams.get('api')) || DEFAULT_API;
   const REFRESH_MS = 60_000;
 
+  // --- UI state: filters + sorting, round-tripped through the URL ---------
+  // The `api` param is reserved for the local-dev override and is not
+  // something the filter form touches, so we pass through whatever was
+  // already there when writing state back.
+  const STATE = {
+    region: '',
+    status: new Set(['ok', 'warning', 'critical', 'down']),
+    minScore: 0,
+    sortBy: 'score',
+    sortDir: 'desc',
+  };
+  let lastStatusResponse = null;
+
+  function readStateFromUrl() {
+    const q = new URL(window.location.href).searchParams;
+    if (q.has('region')) STATE.region = q.get('region') || '';
+    if (q.has('status')) {
+      STATE.status = new Set(q.get('status').split(',').filter(Boolean));
+    }
+    const ms = q.get('minScore');
+    if (ms != null && !Number.isNaN(+ms)) STATE.minScore = Math.max(0, Math.min(100, +ms));
+    const sb = q.get('sortBy');
+    if (sb) STATE.sortBy = sb;
+    const sd = q.get('sortDir');
+    if (sd === 'asc' || sd === 'desc') STATE.sortDir = sd;
+  }
+
+  function writeStateToUrl() {
+    const u = new URL(window.location.href);
+    const q = u.searchParams;
+    // Preserve `api=` (developer override) if it was already set.
+    const apiOverride = q.get('api');
+    // Wipe our keys before re-writing, so clearing a filter removes its param.
+    ['region', 'status', 'minScore', 'sortBy', 'sortDir'].forEach(k => q.delete(k));
+    if (STATE.region) q.set('region', STATE.region);
+    // Only serialise status when something is unselected — a full set is the default.
+    if (STATE.status.size !== 4) q.set('status', [...STATE.status].join(','));
+    if (STATE.minScore > 0) q.set('minScore', String(STATE.minScore));
+    if (STATE.sortBy !== 'score') q.set('sortBy', STATE.sortBy);
+    if (STATE.sortDir !== 'desc') q.set('sortDir', STATE.sortDir);
+    if (apiOverride) q.set('api', apiOverride); else q.delete('api');
+    // Restore api at the tail so it stays a developer affordance, not
+    // mixed in with the user-visible filter params.
+    if (apiOverride) { q.delete('api'); q.set('api', apiOverride); }
+    history.replaceState(null, '', u.toString());
+  }
+
+  function applyFiltersAndSort(nodes) {
+    const filtered = nodes.filter(n => {
+      if (STATE.region && n.region !== STATE.region) return false;
+      if (!STATE.status.has(n.status)) return false;
+      // A node with null score fails a >0 threshold filter, as would any
+      // strictly numeric rule — consistent with how `/status` emits it.
+      if (STATE.minScore > 0) {
+        if (n.score == null || n.score < STATE.minScore) return false;
+      }
+      return true;
+    });
+
+    // Sort keys map a node to a comparable value. Null-ish values sort to
+    // the end regardless of direction, so broken nodes never hide rows.
+    const keyFns = {
+      name: n => n.url.replace(/^https?:\/\//, '').toLowerCase(),
+      region: n => (n.region || 'zzz').toLowerCase(),
+      latency: n => (n.latency_ms == null ? Number.POSITIVE_INFINITY : n.latency_ms),
+      score: n => (n.score == null ? -1 : n.score),
+      status: n => ({ ok: 0, warning: 1, critical: 2, down: 3, unknown: 4 }[n.status] ?? 9),
+    };
+    const key = keyFns[STATE.sortBy] || keyFns.score;
+    const dir = STATE.sortDir === 'asc' ? 1 : -1;
+    filtered.sort((a, b) => {
+      const va = key(a); const vb = key(b);
+      if (va === vb) return 0;
+      return va < vb ? -dir : dir;
+    });
+    return filtered;
+  }
+
   // One Chart.js instance per node, keyed by URL. Re-rendering re-uses the
   // instance and updates .data — full rebuild would leak listeners.
   const sparkCharts = new Map();
@@ -193,23 +271,103 @@
     }
   }
 
+  function renderNodes() {
+    if (!lastStatusResponse) return;
+    const container = document.getElementById('nodes');
+    const filtered = applyFiltersAndSort(lastStatusResponse.nodes);
+
+    // Drop any outdated sparkline chart refs — their canvases are about to
+    // disappear, so leaving stale entries around leaks memory over hours.
+    sparkCharts.clear();
+
+    container.innerHTML = '';
+    if (filtered.length === 0) {
+      container.appendChild(el('p', { class: 'loading' }, 'No nodes match the current filters.'));
+    } else {
+      for (const n of filtered) container.appendChild(buildCard(n));
+    }
+
+    const count = document.getElementById('match-count');
+    if (count) {
+      count.textContent = filtered.length === lastStatusResponse.nodes.length
+        ? `${filtered.length} nodes`
+        : `${filtered.length} / ${lastStatusResponse.nodes.length} nodes`;
+    }
+
+    // Hydration fires per visible card. We kick them off after paint so
+    // the first render isn't gated on 10 extra network calls.
+    filtered.forEach(n => { hydrateNode(n).catch(e => console.warn('hydrate failed', n.url, e)); });
+  }
+
+  function populateRegionOptions(nodes) {
+    const sel = document.getElementById('f-region');
+    if (!sel) return;
+    const regions = [...new Set(nodes.map(n => n.region).filter(Boolean))].sort();
+    // Keep the "all" entry, replace the rest on every refresh (cheap, idempotent).
+    sel.innerHTML = '';
+    sel.appendChild(el('option', { value: '' }, 'all'));
+    for (const r of regions) sel.appendChild(el('option', { value: r }, r));
+    sel.value = STATE.region;
+  }
+
+  function syncControlsFromState() {
+    const q = sel => document.getElementById(sel);
+    if (q('f-region')) q('f-region').value = STATE.region;
+    document.querySelectorAll('.ctrl-status input[type=checkbox]').forEach(cb => {
+      cb.checked = STATE.status.has(cb.value);
+    });
+    if (q('f-score')) { q('f-score').value = String(STATE.minScore); q('f-score-val').textContent = String(STATE.minScore); }
+    if (q('f-sort')) q('f-sort').value = STATE.sortBy;
+    if (q('f-sort-dir')) q('f-sort-dir').textContent = STATE.sortDir === 'asc' ? '↑' : '↓';
+  }
+
+  function bindControls() {
+    const region = document.getElementById('f-region');
+    region.addEventListener('change', () => { STATE.region = region.value; writeStateToUrl(); renderNodes(); });
+
+    document.querySelectorAll('.ctrl-status input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.checked) STATE.status.add(cb.value); else STATE.status.delete(cb.value);
+        writeStateToUrl(); renderNodes();
+      });
+    });
+
+    const score = document.getElementById('f-score');
+    const scoreVal = document.getElementById('f-score-val');
+    score.addEventListener('input', () => { scoreVal.textContent = score.value; });
+    score.addEventListener('change', () => { STATE.minScore = +score.value; writeStateToUrl(); renderNodes(); });
+
+    document.getElementById('f-sort').addEventListener('change', (e) => {
+      STATE.sortBy = e.target.value; writeStateToUrl(); renderNodes();
+    });
+    document.getElementById('f-sort-dir').addEventListener('click', () => {
+      STATE.sortDir = STATE.sortDir === 'asc' ? 'desc' : 'asc';
+      syncControlsFromState(); writeStateToUrl(); renderNodes();
+    });
+
+    document.getElementById('f-reset').addEventListener('click', () => {
+      STATE.region = '';
+      STATE.status = new Set(['ok', 'warning', 'critical', 'down']);
+      STATE.minScore = 0;
+      STATE.sortBy = 'score';
+      STATE.sortDir = 'desc';
+      syncControlsFromState(); writeStateToUrl(); renderNodes();
+    });
+  }
+
   async function refresh() {
     try {
       const status = await getJson('/api/v1/status');
       clearError();
+      lastStatusResponse = status;
 
       document.getElementById('meta-methodology').textContent = status.methodology_version;
       document.getElementById('meta-refblock').textContent =
         status.reference_block == null ? '—' : status.reference_block.toLocaleString('en-US');
       document.getElementById('meta-updated').textContent = status.generated_at;
 
-      const container = document.getElementById('nodes');
-      container.innerHTML = '';
-      for (const n of status.nodes) container.appendChild(buildCard(n));
-
-      // Fire hydration calls per node in parallel. They don't block the
-      // next refresh — if one is slow we just update late.
-      status.nodes.forEach(n => { hydrateNode(n).catch(e => console.warn('hydrate failed', n.url, e)); });
+      populateRegionOptions(status.nodes);
+      renderNodes();
     } catch (e) {
       console.error(e);
       const where = API_BASE || 'same origin';
@@ -218,6 +376,9 @@
   }
 
   // Kick off.
+  readStateFromUrl();
+  bindControls();
+  syncControlsFromState();
   refresh();
   setInterval(refresh, REFRESH_MS);
 })();
