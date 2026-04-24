@@ -2,13 +2,14 @@
 //
 // Polls /api/v1/status every 60 s for the headline numbers, and /history
 // + /uptime once per node per render for the sparkline and the 24 h / 7 d
-// uptime stats. The API base URL is auto-detected: when the page is
-// served from the VM itself the request is loopback; when developed
-// locally through an SSH tunnel it's http://localhost:8110. Override via
-// `?api=` query param if you want to point at a different host.
+// uptime stats. The API base URL is empty by default — the dashboard is
+// served from the same origin as the API in production, so relative
+// paths like `/api/v1/status` hit the right host without any hard-coded
+// URL. For local development through an SSH tunnel, append
+// `?api=http://localhost:8110` to the page URL.
 
 (() => {
-  const DEFAULT_API = 'http://localhost:8110';
+  const DEFAULT_API = '';
   const API_BASE = (new URL(window.location.href).searchParams.get('api')) || DEFAULT_API;
   const REFRESH_MS = 60_000;
 
@@ -211,7 +212,8 @@
       status.nodes.forEach(n => { hydrateNode(n).catch(e => console.warn('hydrate failed', n.url, e)); });
     } catch (e) {
       console.error(e);
-      showError(`Failed to reach the monitor API at ${API_BASE}. Is the SSH tunnel up?`);
+      const where = API_BASE || 'same origin';
+      showError(`Failed to reach the monitor API at ${where}.`);
     }
   }
 
