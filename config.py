@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 HERE = Path(__file__).resolve().parent
 DATA_DIR = HERE / "data"
@@ -43,6 +44,28 @@ METHODOLOGY_VERSION: str = "mv1"
 # online (Phase 5+), each measurement row carries this so we can tell which
 # observer saw what. Override via env var when running a second instance.
 SOURCE_LOCATION: str = os.environ.get("STEEMAPPS_SOURCE_LOCATION", "contabo-de-1")
+
+
+# Admin token for the participant-management routes. Set via .env.local on
+# the production host (file mode 600, owned by the service user). When
+# unset the admin routes refuse every request — a deliberate fail-closed
+# default so an accidentally-deployed build can't be used to enrol new
+# participants without operator action.
+ADMIN_TOKEN: Optional[str] = os.environ.get("STEEMAPPS_ADMIN_TOKEN") or None
+
+
+# Display metadata for the built-in monitor instance. Surfaces in the
+# /api/v1/sources response so the public-facing dashboard can credit
+# the operator alongside community participants. The matching label
+# is SOURCE_LOCATION above — tying the two together is what lets the
+# sources view group the primary monitor with its participant peers.
+PRIMARY_SOURCE: dict = {
+    "label":         SOURCE_LOCATION,
+    "steem_account": os.environ.get("STEEMAPPS_PRIMARY_STEEM", "greece-lover"),
+    "display_label": os.environ.get("STEEMAPPS_PRIMARY_DISPLAY", "Welako VM (DE)"),
+    "region":        os.environ.get("STEEMAPPS_PRIMARY_REGION", "eu-central"),
+    "primary":       True,
+}
 
 
 # Approximate geographic centres for each region name used in nodes.json,

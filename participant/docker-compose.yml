@@ -1,0 +1,13 @@
+services:
+  participant:
+    build: .
+    image: steemapps-participant:latest
+    container_name: steemapps-participant
+    restart: unless-stopped
+    env_file:
+      - .env
+    # No ports exposed — the script only makes outbound calls.
+    # Resource limits are intentionally generous; the script averages
+    # < 30 MB RAM and < 1% of one core.
+    mem_limit: 128m
+    cpus: 0.25

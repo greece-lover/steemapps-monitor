@@ -7,6 +7,51 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ## [Unreleased]
 
+## [Phase 6 Etappe 8] — 2026-04-25
+
+### Added
+
+- `participants.py` — manage external measurement contributors: key generation (`sapk_…` prefix, 256-bit entropy), bcrypt hashing alongside a SHA-256 lookup index for O(1) auth at any participant count, CRUD helpers over the new `participants` table
+- `ingest.py` — standalone validation and rate-limit layer: per-participant token bucket (700/h, burst 100), timestamp tolerance `−15 min … +60 s`, plausibility bounds for latency, reject-reason enum surfaced in API responses
+- `database.py` — new `participants` table with `UNIQUE` constraint on `steem_account`; new composite index `(source_location, timestamp)`
+- `api.py` — six new endpoints: `POST /api/v1/ingest`, `POST/GET/PATCH/DELETE /api/v1/admin/participants[/{id}]`, `GET /api/v1/sources`, `GET /api/v1/nodes`. Admin auth fail-closed against the `STEEMAPPS_ADMIN_TOKEN` env var; constant-time compare via `secrets.compare_digest`
+- `participant/` — subdirectory with the contributor measurement script: `monitor.py` (177 effective lines, single dependency httpx), `Dockerfile`, `docker-compose.yml`, `systemd-service.example`, `.env.example`, bilingual README
+- `frontend/sources.html` + `js/sources.js` — new dashboard page listing measurement sources (linked Steem handle, region, 24h/7d counts)
+- `common.js` — attribution footer rendered on every page; loads `/api/v1/sources` and appends inside the existing `.footnote` block
+- "Sources" nav link added to every dashboard page
+- `docs/PARTICIPATE.md` + `docs/TEILNEHMEN.md` — bilingual contributor onboarding (prerequisites, install, FAQ)
+- `docs/API.md` — full documentation of the six new endpoints
+- `scripts/dry_run_participant.py` — end-to-end dry run against an in-process TestClient (mock participant, three measurements, verified in DB and `/api/v1/sources`)
+- `tests/test_api_etappe8.py` — 31 new pytest tests: ingest happy/sad paths, auth behaviour, rate-limit trigger, admin CRUD, sources endpoint, pure-module tests for `RateLimiter` and `validate_row`
+- `requirements.txt` — `bcrypt>=4.2,<5` as a new backend dependency
+
+### Plan corrections before implementation
+
+- Rate limit raised from the original 120/h to **700/h** — the participant script produces 600 measurements/h (10 nodes × 60 s), so 120/h would have produced an immediate 429. Burst capacity 100 covers two full 5-minute batches plus retry headroom
+- Timestamp tolerance widened from the original 5 min to **−15 min / +60 s** — the script's 5-minute batch plus network latency plus NTP drift would have rejected the oldest rows in nearly every batch
+- `UNIQUE` constraint on `steem_account` enforced directly in the DB schema rather than only in application logic, so duplicate registration fails at the engine level
+
+### Design decisions
+
+- API keys are double-hashed: bcrypt to satisfy the spec, SHA-256 hex as a lookup index. Lookup is therefore O(1) on a UNIQUE index and verification stays constant-time via `bcrypt.checkpw`. Rationale documented in the schema comment in `database.py` and the module docstring of `participants.py`
+- `verify_api_key` returns the same `None` for "key unknown", "key wrong", and "key deactivated"; the API layer surfaces them all as a single 401 message — otherwise an attacker could enumerate active accounts by probing
+- Ingest writes with `source_location = participant.display_label`, not the Steem handle — the operator can rename the display label without re-tagging historical rows
+- Pydantic models were moved to module scope after a first attempt defined them inside `build_app()` and FastAPI's OpenAPI introspection failed to see them as body parameters (symptom: every POST 422'd with "Field required: query.body")
+
+### Locally verified
+
+- 109/109 pytest green (78 prior + 31 new, no regressions)
+- `scripts/dry_run_participant.py` succeeded: mock participant registered, three measurements ingested, correctly persisted with `display_label` in the DB, counted in `/api/v1/sources`
+- Participant script: syntax compile OK, 177 effective lines of code (under the spec's 200-line guideline)
+
+### Pending for cutover on the production server
+
+- Set `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` (file mode 600, owned by `steemapps-monitor`)
+- Install bcrypt into the server venv: `.venv/bin/pip install "bcrypt>=4.2,<5"`
+- Copy frontend files (sources.html, sources.js, updated CSS, patched HTML pages) to `/var/www/api.steemapps.com/`
+- Service restart, smoke-test against `/api/v1/sources` and `/api/v1/admin/participants` (the latter with a correct bearer token must return 200 with an empty list; without a token it must return 401)
+- Publish the call-for-participation post after author review
+
 ### Pending for Phase 5 production cutover
 
 - `reporter/.env.local` on the VM, posting key entered manually by Holger (never transmitted in chat)

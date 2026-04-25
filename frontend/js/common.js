@@ -210,6 +210,43 @@
     };
   }
 
+  // -----------------------------------------------------------------
+  //  Attribution footer — runs on every page that has a .footnote.
+  // -----------------------------------------------------------------
+  // Lists the Steem accounts whose data feeds the dashboard, primary
+  // monitor first. Hidden until the fetch returns so a slow API call
+  // does not lay out an empty footer band.
+  async function renderAttribution() {
+    const host = document.querySelector('.footnote');
+    if (!host) return;
+    try {
+      const data = await getJson('/api/v1/sources');
+      if (!data.sources || !data.sources.length) return;
+      const credits = data.sources.map(s => {
+        const handle = `@${s.steem_account}`;
+        const region = s.region ? ` (${s.region})` : '';
+        return `<a href="https://steemit.com/@${encodeURIComponent(s.steem_account)}" target="_blank" rel="noopener">${handle}</a>${region}`;
+      }).join(', ');
+      const div = document.createElement('div');
+      div.className = 'attribution';
+      div.innerHTML = `Measurements contributed by: ${credits}.
+        Want your server here? <a href="sources.html">See Sources →</a>`;
+      host.appendChild(div);
+    } catch {
+      // Silently skip — attribution is decorative; the page is useful
+      // without it and we don't want a transient API blip to surface
+      // an error banner that drowns out real failures elsewhere.
+    }
+  }
+
+  // Fire once after DOMContentLoaded — no autorefresh hookup; the source
+  // list changes on the order of days, not seconds.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderAttribution);
+  } else {
+    renderAttribution();
+  }
+
   window.SteemAPI = {
     API_BASE, el, getJson, showError, clearError,
     preserveApiOverride, fmtLatency, fmtPct, fmtDuration,

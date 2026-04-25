@@ -1,0 +1,45 @@
+# /etc/systemd/system/steemapps-participant.service
+#
+# Drop this file into /etc/systemd/system/, fill in the User and the
+# WorkingDirectory paths, then:
+#   systemctl daemon-reload
+#   systemctl enable --now steemapps-participant
+#
+# .env file lives next to monitor.py and must be chmod 600 owned by
+# the same user the service runs as. The hardening directives match
+# the central monitor's unit so a defender can use the same audit
+# checklist.
+
+[Unit]
+Description=Steemapps community participant — measure Steem nodes from this host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=steemapps-participant
+Group=steemapps-participant
+WorkingDirectory=/opt/steemapps-participant
+EnvironmentFile=/opt/steemapps-participant/.env
+ExecStart=/opt/steemapps-participant/.venv/bin/python -u monitor.py
+Restart=on-failure
+RestartSec=10s
+
+# Hardening — least-privilege defaults.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target
