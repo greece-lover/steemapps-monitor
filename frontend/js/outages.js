@@ -4,7 +4,7 @@
 // download is what you see on the page.
 
 (() => {
-  const { API_BASE, el, getJson, showError, clearError, fmtDuration } = window.SteemAPI;
+  const { API_BASE, el, getJson, showError, clearError, fmtDuration, onAutoRefresh } = window.SteemAPI;
 
   const STATE = {
     range: '30d',
@@ -160,6 +160,10 @@
     // Re-apply the stored node selection now that options are in the DOM.
     document.getElementById('f-out-node').value = STATE.node;
     await load();
+    // Auto-refresh hook: re-fetch the filtered outage list at the
+    // user's chosen interval. The current STATE drives the request,
+    // so live mode reflects whichever filters are active.
+    onAutoRefresh(load);
   }
 
   main();

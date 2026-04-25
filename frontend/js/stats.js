@@ -5,7 +5,7 @@
 // shared `SteemAPI` global from common.js.
 
 (() => {
-  const { API_BASE, el, getJson, showError, clearError, fmtLatency, fmtPct, fmtDuration } = window.SteemAPI;
+  const { API_BASE, el, getJson, showError, clearError, fmtLatency, fmtPct, fmtDuration, onAutoRefresh } = window.SteemAPI;
 
   // Ten visually-distinct hues for the 10-node overlay. The first four
   // match node.html's compare palette so the colours feel consistent
@@ -269,6 +269,17 @@
     });
   }
 
+  // The active range per section is held in the DOM (the `.active`
+  // button); the auto-refresh hook reads it back so a refresh repeats
+  // whichever range the user last picked, not whatever was the initial
+  // value at page load.
+  function activeRange(containerId, fallback) {
+    const c = document.getElementById(containerId);
+    if (!c) return fallback;
+    const btn = c.querySelector('button.active');
+    return btn ? btn.dataset.range : fallback;
+  }
+
   // =========================================================================
   //  Bootstrap
   // =========================================================================
@@ -288,6 +299,19 @@
         loadDailyComparison().catch(e => console.warn('daily', e)),
       ]);
       clearError();
+
+      // Auto-refresh: redraw all five blocks with whichever range each
+      // toggle currently has active. Errors per block are logged but
+      // do not break the cycle.
+      onAutoRefresh(() => {
+        Promise.all([
+          loadRankings(activeRange('ranking-range', '24h')).catch(e => console.warn('rankings', e)),
+          loadAvailability(activeRange('availability-range', '24h')).catch(e => console.warn('availability', e)),
+          loadGlobalLatency(activeRange('global-latency-range', '24h')).catch(e => console.warn('global latency', e)),
+          loadBiggestOutages().catch(e => console.warn('outages', e)),
+          loadDailyComparison().catch(e => console.warn('daily', e)),
+        ]);
+      });
     } catch (e) {
       console.error(e);
       showError(`Failed to load statistics: ${e.message}`);

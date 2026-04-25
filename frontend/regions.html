@@ -48,11 +48,18 @@
       <span class="section-sub">Pin colour = current aggregated status of the region</span>
     </div>
     <div id="region-map" class="region-map" aria-label="world map with node locations"></div>
-    <div class="calendar-legend" style="margin-top:12px;">
-      <span class="ck green"></span> all ok
-      <span class="ck yellow"></span> degraded
-      <span class="ck red"></span> one or more down
-      <span class="ck grey"></span> no data
+    <div class="map-legend" aria-label="map legend">
+      <div class="map-legend-row">
+        <span class="map-legend-title">Monitored Nodes</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#5eea88"></span>all ok</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#e8c34a"></span>degraded</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#ef6a6a"></span>one or more down</span>
+        <span class="map-legend-item"><span class="map-legend-dot" style="background:#4b4b4b"></span>no data</span>
+      </div>
+      <div class="map-legend-row">
+        <span class="map-legend-title">Measurement Sources</span>
+        <span class="map-legend-item"><span class="map-legend-diamond"></span>primary monitor + community contributors</span>
+      </div>
     </div>
   </section>
 

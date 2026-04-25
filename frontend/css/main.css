@@ -829,6 +829,51 @@ a.node-card:hover { border-color: var(--accent-dim); }
 .popup-lat { color: var(--text); }
 .popup-up  { color: var(--text-muted); }
 
+/* Map legend (regions.html). Two rows — one per marker layer — with
+   the same swatch language as the rest of the dashboard. */
+.map-legend {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.map-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.map-legend-title {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  margin-right: 4px;
+}
+.map-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-legend-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block;
+}
+.map-legend-diamond {
+  width: 10px; height: 10px;
+  background: var(--accent);
+  border: 1px solid var(--bg);
+  transform: rotate(45deg);
+  display: inline-block;
+}
+
+/* Source markers — Leaflet's default divIcon styling adds a faint white
+   background; clear it so the SVG diamond renders cleanly on the dark
+   tiles. */
+.source-marker { background: transparent; border: 0; }
+
 /* Outage-log export controls */
 .ctrl-export {
   margin-left: auto;

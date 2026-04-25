@@ -958,6 +958,63 @@ def build_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="participant not found")
         return {"deleted": True, "id": participant_id}
 
+    @app.get("/api/v1/sources/locations")
+    def sources_locations() -> dict:
+        """Geo-decorated list of active measurement sources.
+
+        Powers the lime-coloured markers on the regions map. Mirrors
+        /api/v1/sources but adds (lat, lng, region_label) per source
+        from config.REGION_COORDINATES — a region without an anchor
+        ("global", "unknown") returns lat=lng=null and the frontend
+        skips it on the map (it still appears in the Sources table).
+        """
+        parts = participants_mod.list_participants(db_path=database.DB_PATH)
+        counts = participants_mod.measurement_counts(db_path=database.DB_PATH)
+        primary = config.PRIMARY_SOURCE
+        primary_counts = counts.get(primary["label"], {"h24": 0, "h7d": 0, "last_seen": None})
+
+        def _decorate(*, id, primary_flag, steem_account, display_label, region, h24, last_seen):
+            geo = config.REGION_COORDINATES.get(region or "", {})
+            return {
+                "id": id,
+                "primary": primary_flag,
+                "steem_account": steem_account,
+                "display_label": display_label,
+                "region": region,
+                "region_label": geo.get("label") or region,
+                "lat": geo.get("lat"),
+                "lng": geo.get("lng"),
+                "measurements_24h": h24,
+                "last_seen": last_seen,
+            }
+
+        out = [_decorate(
+            id=0,
+            primary_flag=True,
+            steem_account=primary["steem_account"],
+            display_label=primary["display_label"],
+            region=primary["region"],
+            h24=primary_counts["h24"],
+            last_seen=primary_counts["last_seen"],
+        )]
+        for p in parts:
+            if not p.active:
+                continue
+            c = counts.get(p.display_label, {"h24": 0, "h7d": 0, "last_seen": None})
+            out.append(_decorate(
+                id=p.id,
+                primary_flag=False,
+                steem_account=p.steem_account,
+                display_label=p.display_label,
+                region=p.region,
+                h24=c["h24"],
+                last_seen=c["last_seen"],
+            ))
+        return {
+            "generated_at": _utcnow_iso(),
+            "sources": out,
+        }
+
     @app.get("/api/v1/sources")
     def sources_list() -> dict:
         """Public list of measurement sources for the dashboard.
