@@ -190,8 +190,8 @@ def _participation_block(repo_url: str) -> str:
         "view of node performance.\n\n"
         f"- Participant script and instructions: {participant_dir}\n"
         f"- Full participation guide: {participate_md}\n"
-        "- Request an API key: comment below or send a Steem memo to "
-        "@greece-lover with your account name, server label, and region.\n\n"
+        "- Request an API key: visit https://api.steemapps.com/join.html — "
+        "fully automated, takes about 2 minutes.\n\n"
         "Contributors get attribution on the "
         "[Sources page](https://api.steemapps.com/sources.html)."
     )

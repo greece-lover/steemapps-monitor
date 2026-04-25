@@ -17,13 +17,13 @@ Every 60 seconds, `monitor.py` issues one JSON-RPC `condenser_api.get_dynamic_gl
 
 ### Before you start
 
-You need an API key. Request one from `@greece-lover` on Steem (or via the contact channels listed at <https://steemapps.com/>) and tell us:
+You need an API key. Get one through the self-service form at <https://api.steemapps.com/join.html>. The form asks for:
 
 1. Your Steem account name (will be shown on the dashboard).
 2. A short label for your server, e.g. `Hetzner FSN1`.
 3. The geographic region of the server (e.g. `us-east`, `asia`, `eu-central`).
 
-You will receive a single `sapk_…` key once. Store it on the host running the script and nowhere else; it cannot be recovered.
+The form checks the account exists on-chain and shows your `sapk_…` key on the next screen. Store it on the host running the script and nowhere else; it cannot be retrieved a second time.
 
 ### Install via Docker (recommended)
 
@@ -104,13 +104,13 @@ Alle 60 Sekunden ruft `monitor.py` bei jedem der 10 vom zentralen Dashboard übe
 
 ### Vor dem Start
 
-Du brauchst einen API-Key. Beantrage einen bei `@greece-lover` auf Steem (oder über die Kontaktkanäle auf <https://steemapps.com/>) und gib uns:
+Du brauchst einen API-Key. Hol ihn dir über das Self-Service-Formular unter <https://api.steemapps.com/join.html>. Das Formular fragt nach:
 
-1. Deinen Steem-Account-Namen (wird im Dashboard angezeigt).
-2. Ein kurzes Label für deinen Server, z. B. `Hetzner FSN1`.
-3. Die geografische Region des Servers (z. B. `us-east`, `asia`, `eu-central`).
+1. Deinem Steem-Account-Namen (wird im Dashboard angezeigt).
+2. Einem kurzen Label für deinen Server, z. B. `Hetzner FSN1`.
+3. Der geografischen Region des Servers (z. B. `us-east`, `asia`, `eu-central`).
 
-Du bekommst einmalig einen `sapk_…`-Key. Speichere ihn ausschließlich auf dem Host, der das Skript ausführt; er lässt sich nicht wiederherstellen.
+Das Formular prüft, ob der Account auf der Chain existiert, und zeigt deinen `sapk_…`-Key direkt im nächsten Schritt. Speichere ihn ausschließlich auf dem Host, der das Skript ausführt; er lässt sich nicht ein zweites Mal abrufen.
 
 ### Installation per Docker (empfohlen)
 

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Join · Steem API Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="site-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <div class="brand-title">Become a Measurement Source</div>
+        <div class="brand-tagline">Run our 200-line script on your server, contribute measurements, get attributed on the dashboard.</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="toolbar">
+        <button type="button" class="toolbar-btn" data-theme-toggle>☀ Light</button>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">Overview</a>
+        <a href="stats.html">Stats</a>
+        <a href="regions.html">Regions</a>
+        <a href="outages.html">Outages</a>
+        <a href="sources.html">Sources</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Form panel: hidden once registration succeeds. -->
+  <section class="join-step is-active" id="form-panel" aria-labelledby="form-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="form-title">Register your server</h2>
+    </div>
+
+    <form class="join-form" id="join-form" autocomplete="off">
+      <div class="join-field">
+        <label for="f-account">Steem account</label>
+        <input id="f-account" name="steem_account" type="text" required
+               minlength="3" maxlength="16" pattern="[a-z0-9.\-]+"
+               placeholder="your-steem-handle">
+        <span class="join-field-hint">3–16 chars, lowercase letters, digits, dots and hyphens.</span>
+      </div>
+
+      <div class="join-field">
+        <label for="f-label">Display label</label>
+        <input id="f-label" name="display_label" type="text" required
+               maxlength="64" placeholder="e.g. My VM (DE)">
+        <span class="join-field-hint">Shown on the Sources page next to your contributions.</span>
+      </div>
+
+      <div class="join-field">
+        <label for="f-region">Region</label>
+        <select id="f-region" name="region" required>
+          <option value="">Loading…</option>
+        </select>
+        <span class="join-field-hint">Approximate location of the server you'll run the script on.</span>
+      </div>
+
+      <div>
+        <button type="submit" class="btn-primary" id="btn-register">Get API Key</button>
+      </div>
+      <div class="join-error" id="form-error"></div>
+    </form>
+  </section>
+
+  <!-- Result panel: shown only after a successful POST. -->
+  <section class="join-step" id="result-panel" aria-labelledby="result-title" hidden>
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="result-title">Your API key</h2>
+    </div>
+
+    <p class="join-key-warning"><strong>Save this key now — it cannot be retrieved again.</strong> If you lose it, ask the operator to issue a fresh one.</p>
+
+    <div class="join-key-box" id="api-key">—</div>
+
+    <div class="join-actions">
+      <button type="button" class="btn-secondary" id="btn-copy-key">Copy key</button>
+      <a class="btn-secondary" href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/PARTICIPATE.md" target="_blank" rel="noopener">Read PARTICIPATE.md →</a>
+      <a class="btn-secondary" href="https://github.com/greece-lover/steemapps-monitor/tree/main/participant" target="_blank" rel="noopener">Docker quick-start →</a>
+    </div>
+  </section>
+
+  <section class="footnote">
+    <p>How it works: register here with your Steem account, label, and region.
+       The form checks that the account exists on-chain and issues an API key
+       on the spot. Run the participant script with that key and your
+       measurements show up on the
+       <a href="sources.html">Sources page</a> within ~10 minutes.</p>
+  </section>
+
+</main>
+
+<script src="js/common.js" defer></script>
+<script src="js/join.js" defer></script>
+</body>
+</html>

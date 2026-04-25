@@ -143,6 +143,9 @@ def test_participation_block_has_three_action_items():
     assert "Participant script and instructions:" in body
     assert "Full participation guide:" in body
     assert "Request an API key" in body
+    # Self-service onboarding URL — manual "DM the operator" variant
+    # is intentionally no longer advertised.
+    assert "https://api.steemapps.com/join.html" in body
     # Linked sources page on the live dashboard, not a file path.
     assert "https://api.steemapps.com/sources.html" in body
 
