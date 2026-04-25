@@ -15,23 +15,61 @@ through an SSH tunnel without proxy games.
 
 from __future__ import annotations
 
+import secrets
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import unquote
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 import config
 import database
+import ingest as ingest_mod
+import participants as participants_mod
 import scoring
 from cache import ttl_cache
 
 
 # Tracked so /health can report how long the process has been up.
 _BOOT_TS = time.time()
+
+
+# -----------------------------------------------------------------
+# Pydantic models for request bodies. Defined at module scope so
+# FastAPI's OpenAPI introspection picks them up correctly — when
+# the same class is declared inside build_app() the parameter
+# resolution falls back to "single string query param" and rejects
+# every POST with a 422 missing-field error.
+# -----------------------------------------------------------------
+
+
+class IngestMeasurement(BaseModel):
+    timestamp: str
+    node_url: str
+    success: bool
+    latency_ms: Optional[int] = None
+    block_height: Optional[int] = None
+    error_category: Optional[str] = None
+
+
+class IngestRequest(BaseModel):
+    measurements: list[IngestMeasurement] = Field(min_length=1, max_length=ingest_mod.MAX_BATCH_SIZE)
+
+
+class ParticipantCreate(BaseModel):
+    steem_account: str = Field(min_length=2, max_length=32)
+    display_label: str = Field(min_length=1, max_length=64)
+    region: Optional[str] = Field(default=None, max_length=32)
+    note: Optional[str] = Field(default=None, max_length=200)
+
+
+class ParticipantPatch(BaseModel):
+    active: Optional[bool] = None
+    note: Optional[str] = Field(default=None, max_length=200)
 
 
 def _utcnow_iso() -> str:
@@ -740,6 +778,230 @@ def build_app() -> FastAPI:
         return {
             "generated_at": _utcnow_iso(),
             **data,
+        }
+
+    # ------------------------------------------------------------------ #
+    #  Phase 6 Etappe 8 — community ingest, admin, sources.              #
+    # ------------------------------------------------------------------ #
+    # Ingest accepts batched measurements from external participants;
+    # admin manages those participants; /sources surfaces them in the
+    # dashboard. All three live here so build_app() owns the rate-limiter
+    # state (analogous to how it owns the ttl_caches above).
+
+    rate_limiter = ingest_mod.RateLimiter()
+
+    def _require_admin(authorization: Optional[str]) -> None:
+        """Validate the Bearer admin token. Fail-closed when unset."""
+        expected = config.ADMIN_TOKEN
+        if not expected:
+            # Fail closed: a build deployed without the env var must
+            # not silently accept admin commands. 503 (rather than 401)
+            # signals "this surface is not configured", not "wrong key".
+            raise HTTPException(status_code=503, detail="admin disabled — STEEMAPPS_ADMIN_TOKEN not set")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        token = authorization[len("Bearer "):]
+        # compare_digest is constant-time; protects against the trivial
+        # "compare and short-circuit" timing leak in `==`.
+        if not secrets.compare_digest(token, expected):
+            raise HTTPException(status_code=401, detail="invalid admin token")
+
+    @app.post("/api/v1/ingest")
+    def ingest_measurements(
+        body: IngestRequest,
+        x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+    ) -> dict:
+        """Batched ingest of community-contributed measurements."""
+        if not x_api_key:
+            raise HTTPException(status_code=401, detail="missing X-API-Key header")
+        participant = participants_mod.verify_api_key(x_api_key, db_path=database.DB_PATH)
+        if participant is None:
+            # Same response regardless of "no row" / "wrong hash" /
+            # "deactivated" — see participants.verify_api_key for why.
+            raise HTTPException(status_code=401, detail="invalid or inactive api key")
+
+        granted, remaining = rate_limiter.consume(str(participant.id), len(body.measurements))
+        if not granted:
+            raise HTTPException(
+                status_code=429,
+                detail=f"rate limit exceeded — {int(remaining)} tokens remaining; cap {ingest_mod.RATE_LIMIT_PER_HOUR}/h",
+            )
+
+        known_nodes = {n["url"] for n in config.load_nodes()}
+        accepted = 0
+        rejected: list[dict] = []
+        now = datetime.now(timezone.utc)
+
+        for i, m in enumerate(body.measurements):
+            row = m.model_dump()
+            reason = ingest_mod.validate_row(row, known_nodes=known_nodes, now=now)
+            if reason:
+                rejected.append({"index": i, "reason": reason})
+                continue
+            ts = ingest_mod.normalise_timestamp(row["timestamp"])
+            database.insert_measurement(
+                database.Measurement(
+                    timestamp=ts,
+                    node_url=row["node_url"],
+                    success=bool(row["success"]),
+                    latency_ms=row.get("latency_ms"),
+                    block_height=row.get("block_height"),
+                    error_message=row.get("error_category"),
+                    source_location=participant.display_label,
+                ),
+                database.DB_PATH,
+            )
+            accepted += 1
+
+        return {
+            "accepted": accepted,
+            "rejected": rejected,
+            "rate_limit_remaining": int(remaining),
+        }
+
+    @app.post("/api/v1/admin/participants", status_code=201)
+    def admin_create_participant(
+        body: ParticipantCreate,
+        authorization: Optional[str] = Header(default=None),
+    ) -> dict:
+        """Register a new participant. Returns the plaintext API key once."""
+        _require_admin(authorization)
+        try:
+            participant, plain_key = participants_mod.create_participant(
+                steem_account=body.steem_account,
+                display_label=body.display_label,
+                region=body.region,
+                note=body.note,
+                db_path=database.DB_PATH,
+            )
+        except Exception as e:
+            # The UNIQUE constraint on steem_account raises IntegrityError
+            # when the same account is enrolled twice; we surface that as
+            # 409 so the operator can re-use the existing key instead of
+            # silently creating duplicates.
+            if "UNIQUE" in str(e):
+                raise HTTPException(status_code=409, detail=f"steem_account already registered: {body.steem_account}")
+            raise
+        return {
+            "id": participant.id,
+            "steem_account": participant.steem_account,
+            "display_label": participant.display_label,
+            "region": participant.region,
+            "created_at": participant.created_at,
+            "active": participant.active,
+            "api_key": plain_key,
+            "warning": "Store this API key now — it will not be shown again.",
+        }
+
+    @app.get("/api/v1/admin/participants")
+    def admin_list_participants(
+        authorization: Optional[str] = Header(default=None),
+    ) -> dict:
+        _require_admin(authorization)
+        rows = participants_mod.list_participants(db_path=database.DB_PATH)
+        return {
+            "participants": [
+                {
+                    "id": p.id,
+                    "steem_account": p.steem_account,
+                    "display_label": p.display_label,
+                    "region": p.region,
+                    "created_at": p.created_at,
+                    "active": p.active,
+                    "note": p.note,
+                }
+                for p in rows
+            ],
+        }
+
+    @app.patch("/api/v1/admin/participants/{participant_id}")
+    def admin_patch_participant(
+        participant_id: int,
+        body: ParticipantPatch,
+        authorization: Optional[str] = Header(default=None),
+    ) -> dict:
+        _require_admin(authorization)
+        existing = participants_mod.get_participant(participant_id, db_path=database.DB_PATH)
+        if existing is None:
+            raise HTTPException(status_code=404, detail="participant not found")
+        updated = existing
+        if body.active is not None:
+            updated = participants_mod.set_active(participant_id, body.active, db_path=database.DB_PATH) or existing
+        if body.note is not None:
+            with database.connect(database.DB_PATH) as conn:
+                conn.execute("UPDATE participants SET note=? WHERE id=?", (body.note, participant_id))
+            updated = participants_mod.get_participant(participant_id, db_path=database.DB_PATH) or updated
+        return {
+            "id": updated.id,
+            "steem_account": updated.steem_account,
+            "display_label": updated.display_label,
+            "region": updated.region,
+            "active": updated.active,
+            "note": updated.note,
+        }
+
+    @app.delete("/api/v1/admin/participants/{participant_id}", status_code=200)
+    def admin_delete_participant(
+        participant_id: int,
+        authorization: Optional[str] = Header(default=None),
+    ) -> dict:
+        _require_admin(authorization)
+        deleted = participants_mod.delete_participant(participant_id, db_path=database.DB_PATH)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="participant not found")
+        return {"deleted": True, "id": participant_id}
+
+    @app.get("/api/v1/sources")
+    def sources_list() -> dict:
+        """Public list of measurement sources for the dashboard.
+
+        Always includes the primary monitor (config.PRIMARY_SOURCE) plus
+        every active participant. Inactive participants are hidden so a
+        deactivated key vanishes from the attribution footer immediately."""
+        parts = participants_mod.list_participants(db_path=database.DB_PATH)
+        counts = participants_mod.measurement_counts(db_path=database.DB_PATH)
+        primary = config.PRIMARY_SOURCE
+        primary_counts = counts.get(primary["label"], {"h24": 0, "h7d": 0, "last_seen": None})
+        sources = [{
+            "id": 0,
+            "primary": True,
+            "steem_account": primary["steem_account"],
+            "display_label": primary["display_label"],
+            "region": primary["region"],
+            "active": True,
+            "measurements_24h": primary_counts["h24"],
+            "measurements_7d": primary_counts["h7d"],
+            "last_seen": primary_counts["last_seen"],
+        }]
+        for p in parts:
+            if not p.active:
+                continue
+            c = counts.get(p.display_label, {"h24": 0, "h7d": 0, "last_seen": None})
+            sources.append({
+                "id": p.id,
+                "primary": False,
+                "steem_account": p.steem_account,
+                "display_label": p.display_label,
+                "region": p.region,
+                "active": True,
+                "created_at": p.created_at,
+                "measurements_24h": c["h24"],
+                "measurements_7d": c["h7d"],
+                "last_seen": c["last_seen"],
+            })
+        return {
+            "generated_at": _utcnow_iso(),
+            "sources": sources,
+        }
+
+    @app.get("/api/v1/nodes")
+    def nodes_list() -> dict:
+        """Lean URL+region list. Used by the participant script at startup
+        so the operator does not have to hand-maintain the node list."""
+        nodes = config.load_nodes()
+        return {
+            "generated_at": _utcnow_iso(),
+            "nodes": [{"url": n["url"], "region": n.get("region")} for n in nodes],
         }
 
     return app

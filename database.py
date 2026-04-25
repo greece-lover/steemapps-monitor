@@ -45,6 +45,35 @@ CREATE INDEX IF NOT EXISTS idx_measurements_node_url
     ON measurements (node_url);
 CREATE INDEX IF NOT EXISTS idx_measurements_node_ts
     ON measurements (node_url, timestamp);
+CREATE INDEX IF NOT EXISTS idx_measurements_source
+    ON measurements (source_location, timestamp);
+
+-- Participants are external contributors (Witnesses, node operators) who
+-- run the lightweight monitor.py shipped under participant/ and POST
+-- their measurements to /api/v1/ingest. One row per Steem account.
+--
+-- Why two key columns:
+--   api_key_lookup is a fast SHA-256 hex digest of the plaintext key.
+--   It is UNIQUE-indexed so we can find the matching row in O(1) on
+--   every ingest call without scanning every participant. SHA-256 of a
+--   256-bit random secret is irreversible, so leaking this column does
+--   not leak the key.
+--   api_key_hash is the bcrypt hash of the same plaintext key. Once we
+--   have the candidate row we run a constant-time bcrypt.checkpw against
+--   the inbound key, so a stolen lookup digest alone is not enough to
+--   forge requests. This double-hash setup keeps spec ("API-Keys werden
+--   gehashed gespeichert (bcrypt)") AND keeps lookup at table-size 1.
+CREATE TABLE IF NOT EXISTS participants (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    steem_account   TEXT    NOT NULL UNIQUE,
+    display_label   TEXT    NOT NULL,
+    region          TEXT,
+    api_key_lookup  TEXT    NOT NULL UNIQUE,
+    api_key_hash    TEXT    NOT NULL,
+    created_at      TEXT    NOT NULL,
+    active          INTEGER NOT NULL DEFAULT 1,
+    note            TEXT
+);
 """
 
 

@@ -99,6 +99,160 @@ the subset that responded with a valid head block. Ticks where the node
 was unreachable still count toward `total` — that is the definition of
 uptime we use on the dashboard.
 
+### `GET /api/v1/nodes`
+
+Lean URL-and-region listing — used by the participant script at startup
+so operators do not have to hand-maintain the node list.
+
+```json
+{
+  "generated_at": "2026-04-25T18:30:00Z",
+  "nodes": [
+    { "url": "https://api.steemit.com",       "region": "us-east" },
+    { "url": "https://steemd.steemworld.org", "region": "eu-central" }
+  ]
+}
+```
+
+### `GET /api/v1/sources`
+
+Public list of measurement contributors. The first entry is always the
+primary monitor (`@greece-lover`); the rest are active community
+participants. Inactive participants are omitted, so a deactivated key
+disappears from the attribution footer immediately.
+
+```json
+{
+  "generated_at": "2026-04-25T18:30:00Z",
+  "sources": [
+    {
+      "id": 0,
+      "primary": true,
+      "steem_account": "greece-lover",
+      "display_label": "Welako VM (DE)",
+      "region": "eu-central",
+      "active": true,
+      "measurements_24h": 14400,
+      "measurements_7d": 100800,
+      "last_seen": "2026-04-25T18:29:00Z"
+    },
+    {
+      "id": 7,
+      "primary": false,
+      "steem_account": "alice",
+      "display_label": "Alice (US East)",
+      "region": "us-east",
+      "active": true,
+      "created_at": "2026-04-26T12:00:00Z",
+      "measurements_24h": 14380,
+      "measurements_7d": 100620,
+      "last_seen": "2026-04-25T18:28:50Z"
+    }
+  ]
+}
+```
+
+### `POST /api/v1/ingest`
+
+Community-contributed batch of measurements. Authenticated with a per-
+participant API key in the `X-API-Key` header. See [PARTICIPATE.md](PARTICIPATE.md)
+for how to obtain one.
+
+```http
+POST /api/v1/ingest HTTP/1.1
+X-API-Key: sapk_…
+Content-Type: application/json
+
+{
+  "measurements": [
+    {
+      "timestamp": "2026-04-25T18:25:00Z",
+      "node_url": "https://api.steemit.com",
+      "success": true,
+      "latency_ms": 234,
+      "block_height": 105500000,
+      "error_category": null
+    }
+  ]
+}
+```
+
+Limits and validation:
+
+- Up to 200 measurements per request.
+- Each row's `timestamp` must be within `now - 15 min` and `now + 60 s`.
+- `node_url` must be one of the URLs returned by `/api/v1/nodes`.
+- `latency_ms` must be in `[0, 30000]` and non-null when `success=true`.
+- Per-key rate limit: 700 measurements per hour with a burst capacity
+  of 100 (≈ two five-minute participant batches).
+
+Response shape:
+
+```json
+{
+  "accepted": 9,
+  "rejected": [
+    { "index": 9, "reason": "timestamp_too_old" }
+  ],
+  "rate_limit_remaining": 91
+}
+```
+
+`reason` is one of `unknown_node`, `timestamp_invalid`, `timestamp_too_old`,
+`timestamp_future`, `latency_out_of_range`, `latency_inconsistent`. HTTP
+status codes:
+
+- `200` — request processed (per-row outcome in the body)
+- `401` — missing, malformed, unknown, or deactivated `X-API-Key`
+- `422` — request body fails Pydantic validation (empty list, > 200 rows)
+- `429` — token bucket exhausted; retry after the bucket refills
+
+### `POST /api/v1/admin/participants`
+
+Operator-only. Creates a new participant and returns the plaintext API
+key once. The key is not stored in plain — only its bcrypt hash and a
+SHA-256 lookup digest. Auth via `Authorization: Bearer …` against the
+`STEEMAPPS_ADMIN_TOKEN` env var on the server. When the env var is
+unset every admin route returns `503` (fail-closed).
+
+```http
+POST /api/v1/admin/participants HTTP/1.1
+Authorization: Bearer …
+Content-Type: application/json
+
+{ "steem_account": "alice", "display_label": "Alice (US East)", "region": "us-east" }
+```
+
+```json
+{
+  "id": 7,
+  "steem_account": "alice",
+  "display_label": "Alice (US East)",
+  "region": "us-east",
+  "created_at": "2026-04-26T12:00:00Z",
+  "active": true,
+  "api_key": "sapk_…",
+  "warning": "Store this API key now — it will not be shown again."
+}
+```
+
+### `GET /api/v1/admin/participants`
+
+Operator-only. Lists every participant (active + inactive) without
+revealing keys.
+
+### `PATCH /api/v1/admin/participants/{id}`
+
+Operator-only. Body fields: `active` (bool) and/or `note` (string,
+max 200 chars). Used to deactivate a participant whose data looks
+suspect, without deleting their history.
+
+### `DELETE /api/v1/admin/participants/{id}`
+
+Operator-only. Hard-deletes the row. Past measurements are kept (the
+foreign key is a string, not an integer reference) but new ingest
+attempts with the deleted key fail immediately with `401`.
+
 ## Planned (public surface on `api.steemapps.com`)
 
 Once the monitor is fronted by a reverse proxy on the production server, the

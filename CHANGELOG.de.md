@@ -7,6 +7,55 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 ## [Unveröffentlicht]
 
+## [Phase 6 Etappe 8] — 2026-04-25
+
+### Neu
+
+- `participants.py` — Verwaltung externer Mess-Beitragender: Schlüssel-Generierung (`sapk_…`-Prefix, 256-bit-Entropie), bcrypt-Hashing plus SHA-256-Lookup-Index für O(1)-Auth bei beliebig vielen Teilnehmern, CRUD-Helper über die neue `participants`-Tabelle
+- `ingest.py` — eigenständige Validierungs- und Rate-Limit-Schicht: Token-Bucket pro Teilnehmer (700/h, Burst 100), Timestamp-Toleranz `−15 min … +60 s`, Plausibilitäts-Bounds für Latenz, Reject-Reason-Enum für API-Antworten
+- `database.py`: neue Tabelle `participants` mit `UNIQUE`-Constraint auf `steem_account`, neuer Composite-Index `(source_location, timestamp)`
+- `api.py`: sechs neue Endpoints — `POST /api/v1/ingest`, `POST/GET/PATCH/DELETE /api/v1/admin/participants[/{id}]`, `GET /api/v1/sources`, `GET /api/v1/nodes`. Admin-Auth fail-closed gegen `STEEMAPPS_ADMIN_TOKEN`-ENV; Konstantzeit-Vergleich via `secrets.compare_digest`
+- `participant/` — Subverzeichnis mit dem Mess-Skript für Beitragende: `monitor.py` (177 Code-Zeilen, einzige Dependency httpx), `Dockerfile`, `docker-compose.yml`, `systemd-service.example`, `.env.example`, zweisprachiges README
+- `frontend/sources.html` + `js/sources.js` — neue Dashboard-Seite mit Mess-Quellen-Tabelle (Steem-Handle verlinkt, Region, 24h-/7d-Counts)
+- `common.js`: Attribution-Footer auf jeder Seite, der die Quellen aus `/api/v1/sources` lädt und im bestehenden `.footnote`-Block anzeigt
+- Nav-Link "Sources" zu allen Dashboard-Seiten ergänzt
+- `docs/PARTICIPATE.md` + `docs/TEILNEHMEN.md` — Teilnahme-Anleitung in beiden Sprachen mit Voraussetzungen, Installation, FAQ
+- `docs/API.md`: vollständige Doku der sechs neuen Endpoints
+- `scripts/dry_run_participant.py` — End-to-End-Dry-Run gegen In-Process-TestClient (Mock-Teilnehmer, drei Messungen, Verifikation in DB und in `/api/v1/sources`)
+- `tests/test_api_etappe8.py` — 31 neue pytest-Tests: Ingest happy/sad paths, Auth-Verhalten, Rate-Limit-Trigger, Admin-CRUD, Sources-Endpoint, Pure-Module-Tests für `RateLimiter` und `validate_row`
+- `requirements.txt`: `bcrypt>=4.2,<5` als neue Backend-Dependency
+
+### Plan-Korrekturen vor Implementierung
+
+- Rate-Limit von ursprünglich 120/h auf **700/h** angehoben — das Mess-Skript erzeugt 600 Messungen/h (10 Nodes × 60 s), 120/h hätte sofort 429 geworfen. Burst-Capacity 100 deckt zwei vollständige 5-Min-Batches plus Retry-Spielraum ab
+- Timestamp-Toleranz von ursprünglich 5 min auf **−15 min / +60 s** erweitert — der 5-min-Batch des Skripts plus Netzwerk-Latenz plus NTP-Drift hätte sonst regelmäßig die ältesten Messungen abgelehnt
+- `UNIQUE`-Constraint auf `steem_account` direkt im DB-Schema statt nur in der Anwendungs-Logik — Doppel-Registrierung wird damit auf Engine-Ebene verhindert
+
+### Design-Entscheidungen
+
+- API-Keys werden zweifach gehasht: bcrypt für die Spec-Anforderung plus SHA-256-Hex als Lookup-Index. Lookup ist damit O(1) per UNIQUE-Index, Verifikation läuft konstant-zeit per `bcrypt.checkpw`. Begründung im Schema-Kommentar in `database.py` und im Modul-Docstring von `participants.py`
+- `verify_api_key` liefert für "Key unbekannt", "Key falsch" und "Key deaktiviert" die identische `None`-Antwort. Die API-Layer wandelt das in einen einzigen 401-Text um — sonst wäre Account-Enumeration per Probe trivial möglich
+- Ingest schreibt mit `source_location = participant.display_label`, nicht mit dem Steem-Handle — Operator kann den Anzeige-Namen ändern, ohne dass historische Zeilen umetikettiert werden müssen
+- Pydantic-Modelle wurden auf Modul-Ebene definiert, nachdem im ersten Wurf eine Definition innerhalb von `build_app()` von FastAPIs OpenAPI-Introspection nicht als Body-Parameter erkannt wurde (Symptom: jeder POST 422 mit "Field required: query.body")
+
+### Lokal verifiziert
+
+- 109/109 pytest grün (78 bestehend + 31 neu, keine Regressionen)
+- `scripts/dry_run_participant.py` erfolgreich: Mock-Teilnehmer registriert, drei Messungen ingesticht, korrekt mit `display_label` in DB persistiert, in `/api/v1/sources` gezählt
+- Participant-Skript: Syntax-Compile OK, 177 effektive Code-Zeilen (unter dem Spec-Limit von 200)
+
+### Aufruf-Post-Entwurf
+
+Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Entwurf)". Vor Veröffentlichung vom Autor zu redigieren.
+
+### Noch offen für Cutover auf den production-server
+
+- `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` setzen (file mode 600, Eigentümer `steemapps-monitor`)
+- bcrypt im Server-venv nachinstallieren: `.venv/bin/pip install "bcrypt>=4.2,<5"`
+- Frontend-Dateien (sources.html, sources.js, aktualisierte CSS, gepatchte HTML-Pages) nach `/var/www/api.steemapps.com/`
+- Service-Restart, Smoke-Test gegen `/api/v1/sources` und `/api/v1/admin/participants` (letzteres mit korrektem Bearer-Token muss 200 mit leerer Liste liefern, ohne Token 401)
+- Aufruf-Post nach Review veröffentlichen
+
 ### Noch offen für Phase-5-Produktions-Cutover
 
 - `reporter/.env.local` auf der VM, Posting-Key manuell vom Autor eingetragen (nie per Chat übertragen)
