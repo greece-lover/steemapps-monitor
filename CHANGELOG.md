@@ -133,20 +133,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - Documentation foundation under `docs/`: `ARCHITECTURE`, `CONTRIBUTING`, `SECURITY`, `USER-GUIDE` (all bilingual), `DEPLOYMENT`, `KI_TRANSPARENZ`, `MEASUREMENT-METHODOLOGY`/`MESSMETHODIK`, `API`
 - `LICENSE` (MIT)
 - Python-focused `.gitignore`
-- SSH host alias `steemfork` in the author's SSH config for the development VM
-- Server working directory `/opt/steemapps-monitor/` on the development VM (Ubuntu 24.04, REDACTED-IP)
+- SSH host alias for the development VM in the author's SSH config
+- Server working directory `/opt/steemapps-monitor/` on the local development VM (Ubuntu 24.04)
 - `progress/2026-04-24-phase1-bestandsaufnahme.md` — Phase 1 server audit
 - `progress/2026-04-24-phase2.md` — Phase 2 timestamp log
 - Private GitHub repository `greece-lover/steemapps-monitor`
 
 ### Known deviations from concept
 
-- **Hosting target:** concept names the IONOS server (REDACTED-IP) as production host; initial development happens on the author's local Ubuntu VM. IONOS deployment is deferred to a later phase and will not touch the Alreco installation already running there.
+- **Hosting target:** the production host is deferred to a later phase; initial development happens on the author's local Ubuntu VM.
 
 ## [Phase 1] — 2026-04-24
 
 ### Added
 
-- Server audit of the development VM `steemfork` (REDACTED-IP, Ubuntu 24.04)
+- Server audit of the local development VM (Ubuntu 24.04)
 - Confirmation that existing workloads (`steem-fork`, `sqv-indexer`, `sqv-frontend`) are unaffected
 - Network verification: all four initial Steem API nodes reachable with sub-second latency
