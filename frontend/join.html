@@ -38,8 +38,19 @@
 
 <main class="container">
 
-  <!-- Form panel: hidden once registration succeeds. -->
-  <section class="join-step is-active" id="form-panel" aria-labelledby="form-title">
+  <!-- Why participate? -->
+  <section class="join-step" aria-labelledby="why-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="why-title">Why participate?</h2>
+    </div>
+    <p>Single-location measurements miss what users in other regions actually
+       experience. Your server adds a vantage point — and you get attributed on the
+       <a href="sources.html">Sources page</a> next to the central monitor. The data
+       is public, on-chain, and any third party can build their own analyses on it.</p>
+  </section>
+
+  <!-- Register form: hidden once registration succeeds. -->
+  <section class="join-step" id="form-panel" aria-labelledby="form-title">
     <div class="join-step-head">
       <h2 class="join-step-title" id="form-title">Register your server</h2>
     </div>
@@ -92,12 +103,118 @@
     </div>
   </section>
 
-  <section class="footnote">
-    <p>How it works: register here with your Steem account, label, and region.
-       The form checks that the account exists on-chain and issues an API key
-       on the spot. Run the participant script with that key and your
-       measurements show up on the
-       <a href="sources.html">Sources page</a> within ~10 minutes.</p>
+  <!-- How it works -->
+  <section class="join-step" aria-labelledby="how-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="how-title">How it works</h2>
+    </div>
+    <p>Register above with your Steem account, a label, and a region. The form checks
+       that the account exists on-chain and issues an API key on the spot. Run the
+       participant script with that key and your measurements show up on the
+       <a href="sources.html">Sources page</a> within 5–10 minutes.</p>
+  </section>
+
+  <!-- Quick start with Docker -->
+  <section class="join-step" aria-labelledby="quickstart-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="quickstart-title">Quick start with Docker</h2>
+    </div>
+    <p>After getting your API key above, three commands and you're contributing:</p>
+<pre class="join-pre"><code>git clone https://github.com/greece-lover/steemapps-monitor.git
+cd steemapps-monitor/participant
+cp .env.example .env</code></pre>
+    <p>Open <code>.env</code> in your editor, paste the API key from above, save.</p>
+<pre class="join-pre"><code>docker compose up -d --build</code></pre>
+    <p>Verify measurements are flowing:</p>
+<pre class="join-pre"><code>docker compose logs -f --tail 50</code></pre>
+    <p>You'll see <code>Flushed N (accepted=N)</code> entries within 5 minutes. Your
+       attribution appears on the <a href="sources.html">Sources page</a> automatically.</p>
+  </section>
+
+  <!-- Without Docker -->
+  <section class="join-step" aria-labelledby="systemd-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="systemd-title">Without Docker</h2>
+    </div>
+    <p>Prefer systemd over Docker? See
+       <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/participant/systemd-service.example" target="_blank" rel="noopener">participant/systemd-service.example</a>
+       in the repository for a ready-to-use unit file. About 5 minutes to install.</p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="join-step" aria-labelledby="faq-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="faq-title">FAQ</h2>
+    </div>
+
+    <div class="faq-item">
+      <h3>Why does this need a server?</h3>
+      <p>The script polls each Steem API node every 60 seconds and reports back.
+         Browser-based measurement isn't accurate enough — server-to-server latency
+         tells you what frontends and bots actually experience.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>What does it cost?</h3>
+      <p>The script uses about 30 MB RAM and 50 KB outbound bandwidth per hour. Any
+         small VPS works.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I get the raw measurement data?</h3>
+      <p>Yes. The full API documentation is at
+         <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/API.md" target="_blank" rel="noopener">docs/API.md</a>.
+         If you need a custom data export, ask in the daily report comments.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I run multiple measurement points?</h3>
+      <p>Yes, but use a different Steem account for each. One account = one
+         measurement source.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>What happens if my server goes offline?</h3>
+      <p>Nothing bad. Your contributions just pause until the script runs again. Your
+         registration stays active.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Can I see what data is sent?</h3>
+      <p>Yes, the script is open source under MIT license and is about 200 lines of
+         Python. Read it before installing.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>How do I stop contributing?</h3>
+      <p>Stop the Docker container or systemd service. To remove your registration
+         entirely, send a Steem memo to <code>@greece-lover</code>.</p>
+    </div>
+
+    <div class="faq-item">
+      <h3>Is custom integration possible?</h3>
+      <p>Yes. The data is available via JSON API and as on-chain
+         <code>custom_json</code> operations. Anyone can build their own dashboards
+         or analyses on top. Reach out via Steem comment if you need help with
+         integration.</p>
+    </div>
+  </section>
+
+  <!-- Resources -->
+  <section class="join-step" aria-labelledby="resources-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="resources-title">Resources</h2>
+    </div>
+    <ul class="resources-list">
+      <li>Live dashboard: <a href="index.html">api.steemapps.com</a></li>
+      <li>Sources page (where attribution shows): <a href="sources.html">sources.html</a></li>
+      <li>Daily reports: <a href="https://steemit.com/@steem-api-health" target="_blank" rel="noopener">@steem-api-health on Steemit</a></li>
+      <li>Source code: <a href="https://github.com/greece-lover/steemapps-monitor" target="_blank" rel="noopener">greece-lover/steemapps-monitor</a></li>
+      <li>Participant script: <a href="https://github.com/greece-lover/steemapps-monitor/tree/main/participant" target="_blank" rel="noopener">/participant</a></li>
+      <li>Full participation guide: <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/PARTICIPATE.md" target="_blank" rel="noopener">PARTICIPATE.md</a></li>
+      <li>Methodology: <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/MEASUREMENT-METHODOLOGY.md" target="_blank" rel="noopener">MEASUREMENT-METHODOLOGY.md</a></li>
+      <li>API documentation: <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/API.md" target="_blank" rel="noopener">API.md</a></li>
+    </ul>
   </section>
 
 </main>
