@@ -43,6 +43,9 @@ class ReporterConfig:
     # None so the post does not point at a non-public file path.
     image_dir: Path
     image_url_base: Optional[str]
+    # Steem RPC endpoints beem connects to. None falls back to
+    # broadcast.DEFAULT_STEEM_NODES — see that module for the why.
+    steem_nodes: Optional[list[str]]
 
     @property
     def is_dev(self) -> bool:
@@ -122,4 +125,6 @@ def load(env_file: Path | None = None) -> ReporterConfig:
             "STEEMAPPS_REPORTER_IMAGE_URL_BASE",
             "https://api.steemapps.com/reports",
         ) or None,
+        steem_nodes=[n.strip() for n in os.environ["STEEMAPPS_REPORTER_STEEM_NODES"].split(",") if n.strip()]
+        if os.environ.get("STEEMAPPS_REPORTER_STEEM_NODES") else None,
     )
