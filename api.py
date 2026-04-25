@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 import config
 import database
 import ingest as ingest_mod
+import join as join_mod
 import participants as participants_mod
 import scoring
 from cache import ttl_cache
@@ -70,6 +71,12 @@ class ParticipantCreate(BaseModel):
 class ParticipantPatch(BaseModel):
     active: Optional[bool] = None
     note: Optional[str] = Field(default=None, max_length=200)
+
+
+class JoinRegisterRequest(BaseModel):
+    steem_account: str = Field(min_length=3, max_length=16)
+    display_label: str = Field(min_length=1, max_length=64)
+    region: str = Field(min_length=1, max_length=32)
 
 
 def _utcnow_iso() -> str:
@@ -1002,6 +1009,45 @@ def build_app() -> FastAPI:
         return {
             "generated_at": _utcnow_iso(),
             "nodes": [{"url": n["url"], "region": n.get("region")} for n in nodes],
+        }
+
+    # ------------------------------------------------------------------ #
+    #  Self-service onboarding (/join/*).                                 #
+    # ------------------------------------------------------------------ #
+    # Single-step flow: applicant submits account+label+region; we verify
+    # the account exists on-chain and issue an API key in one response.
+    # No memo verification, no pending state. Operator moderation lives
+    # in /api/v1/admin/participants if a label needs cleanup.
+
+    def _raise_join(err: join_mod.JoinError):
+        raise HTTPException(
+            status_code=err.status_code,
+            detail={"code": err.code, "message": err.message},
+        )
+
+    @app.get("/api/v1/join/regions")
+    def join_regions() -> dict:
+        """Region dropdown options for the join form."""
+        return {"regions": join_mod.allowed_regions()}
+
+    @app.post("/api/v1/join/register", status_code=201)
+    def join_register(body: JoinRegisterRequest) -> dict:
+        try:
+            reg = join_mod.register_participant(
+                steem_account=body.steem_account,
+                display_label=body.display_label,
+                region=body.region,
+                db_path=database.DB_PATH,
+            )
+        except join_mod.JoinError as e:
+            _raise_join(e)
+        p = reg.participant
+        return {
+            "api_key": reg.api_key,
+            "steem_account": p.steem_account,
+            "display_label": p.display_label,
+            "region": p.region,
+            "warning": "Store this key now — it cannot be retrieved again.",
         }
 
     return app

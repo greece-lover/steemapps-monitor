@@ -25,16 +25,17 @@ outbound JSON-RPC calls to the public nodes.
 
 ## How to participate
 
-1. **Request an API key.**
-   Send a Steem direct message to `@greece-lover` (or use any contact
-   channel listed at <https://steemapps.com/>) with:
+1. **Get an API key.**
+   Open <https://api.steemapps.com/join.html> and submit:
    - Your Steem account name
    - A short label for your server (e.g. `Hetzner FSN1`)
    - The geographic region of the server
 
-   You will receive a single API key formatted as `sapk_…` — store it on
-   the host that will run the script and nowhere else. The key cannot be
-   recovered if lost; we can only re-issue.
+   The form checks that the account exists on the Steem chain and
+   issues an API key on the spot. The key has the form `sapk_…` —
+   store it on the host that will run the script and nowhere else. It
+   cannot be retrieved a second time; if you lose it, ask the operator
+   to issue a fresh one.
 
 2. **Install the script.**
    The participant code lives at <https://github.com/greece-lover/steemapps-monitor/tree/main/participant>.

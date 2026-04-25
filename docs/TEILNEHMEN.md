@@ -26,16 +26,17 @@ ausgehende JSON-RPC-Calls zu den öffentlichen Nodes.
 
 ## Ablauf
 
-1. **API-Key anfragen.**
-   Schick dem Account `@greece-lover` auf Steem eine direkte Nachricht
-   (oder nutze einen der Kontaktkanäle auf <https://steemapps.com/>) mit:
-   - Deinem Steem-Account-Namen
-   - Einem kurzen Server-Label (z. B. `Hetzner FSN1`)
-   - Der geografischen Region des Servers
+1. **API-Key holen.**
+   Öffne <https://api.steemapps.com/join.html> und gib ein:
+   - Deinen Steem-Account-Namen
+   - Ein kurzes Server-Label (z. B. `Hetzner FSN1`)
+   - Die geografische Region des Servers
 
-   Du bekommst einmalig einen Key in der Form `sapk_…`. Er wird nur auf
-   dem Host gespeichert, der das Skript ausführt; verloren = nicht
-   wiederherstellbar (nur neu ausgestellt).
+   Das Formular prüft, ob der Account auf der Steem-Chain existiert,
+   und stellt direkt einen API-Key aus. Format: `sapk_…`. Er wird nur
+   auf dem Host gespeichert, der das Skript ausführt — er lässt sich
+   nicht ein zweites Mal abrufen. Bei Verlust beim Operator einen
+   neuen Key anfragen.
 
 2. **Skript installieren.**
    Der Participant-Code liegt unter
