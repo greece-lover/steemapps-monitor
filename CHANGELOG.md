@@ -44,13 +44,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - `scripts/dry_run_participant.py` succeeded: mock participant registered, three measurements ingested, correctly persisted with `display_label` in the DB, counted in `/api/v1/sources`
 - Participant script: syntax compile OK, 177 effective lines of code (under the spec's 200-line guideline)
 
-### Pending for cutover on the production server
+### Cutover on the production server (live since 2026-04-25 04:06 UTC)
 
-- Set `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` (file mode 600, owned by `steemapps-monitor`)
-- Install bcrypt into the server venv: `.venv/bin/pip install "bcrypt>=4.2,<5"`
-- Copy frontend files (sources.html, sources.js, updated CSS, patched HTML pages) to `/var/www/api.steemapps.com/`
-- Service restart, smoke-test against `/api/v1/sources` and `/api/v1/admin/participants` (the latter with a correct bearer token must return 200 with an empty list; without a token it must return 401)
-- Publish the call-for-participation post after author review
+- Service restart in **226 ms** wall time; no tick missed (5,990 → 6,000 rows +10 in one tick)
+- `participants` table created on first startup via `CREATE TABLE IF NOT EXISTS` (idempotent)
+- `bcrypt 4.3.0` installed into the server venv
+- `STEEMAPPS_ADMIN_TOKEN` written to `/opt/steemapps-api-monitor/.env.local` (mode 600, owner steemapps-monitor) — value retrievable via SSH, not in repo
+- systemd unit gained `EnvironmentFile=-/opt/steemapps-api-monitor/.env.local` (dash prefix = optional)
+- End-to-end smoke test with mock participant succeeded (POST → ingest 3 rows → visible in `/sources` → DELETE)
+- Tabu verification: 24 containers and 12 nginx sites unchanged from the pre-flight baseline, all sister domains still HTTP 200
+- Live at `https://api.steemapps.com/sources.html` and `/api/v1/{ingest,sources,nodes,admin/participants}`
+- Backups under `/opt/steemapps-api-monitor/*.pre-etappe8.bak` and `<server>:<backup-path>/etappe8-www-pre.tar.gz`; rollback recipe in `progress/2026-04-25-phase6-etappe8.md`
+
+### Still pending
+
+- Publish the call-for-participation post after author review (once the repo is public)
 
 ### Pending for Phase 5 production cutover
 

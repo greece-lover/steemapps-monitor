@@ -249,11 +249,162 @@ Hinweise zum Post:
 - Witness-Vote-Hinweis am Ende, nicht im Aufmacher
 - Vor Veröffentlichung: Steem-Markdown-Preview, Vorschau-Bild?
 
-## Server-Stand (Welako, außerhalb dieses Commits)
+## Cutover auf den Produktions-Server (durchgeführt 2026-04-25 04:05–04:09 UTC)
 
-**Etappe 7 ist Stand auf dem production-server.** Diese Etappe enthält
-keine Server-Änderungen — der Cutover ist eine separate Aktion mit
-folgenden Schritten:
+Direkt im Anschluss an den Repo-Commit. Ablauf identisch zur Etappe-7-
+Vorlage (Pre-Flight → Backup → Transfer → bcrypt → Token → Restart →
+Smoke → Tabu-Check), zusätzlich systemd-Unit-Patch (EnvironmentFile=).
+
+### Was sich auf dem Server geändert hat
+
+| Pfad | Änderung |
+|---|---|
+| `/opt/steemapps-api-monitor/api.py` | aktualisiert (sechs neue Routes) |
+| `/opt/steemapps-api-monitor/config.py` | aktualisiert (ADMIN_TOKEN, PRIMARY_SOURCE) |
+| `/opt/steemapps-api-monitor/database.py` | aktualisiert (participants-Tabelle + Index) |
+| `/opt/steemapps-api-monitor/ingest.py` | **neu** |
+| `/opt/steemapps-api-monitor/participants.py` | **neu** |
+| `/opt/steemapps-api-monitor/requirements.txt` | bcrypt ergänzt |
+| `/opt/steemapps-api-monitor/.venv/` | bcrypt 4.3.0 nachinstalliert |
+| `/opt/steemapps-api-monitor/.env.local` | **neu**, mode 600, owner steemapps-monitor, enthält STEEMAPPS_ADMIN_TOKEN (32 Byte hex) |
+| `/etc/systemd/system/steemapps-api-monitor.service` | `EnvironmentFile=-/opt/steemapps-api-monitor/.env.local` ergänzt (Dash-Prefix = optional) |
+| `/var/www/api.steemapps.com/sources.html` | **neu** |
+| `/var/www/api.steemapps.com/js/sources.js` | **neu** |
+| `/var/www/api.steemapps.com/js/common.js` | aktualisiert (Attribution-Footer) |
+| `/var/www/api.steemapps.com/css/main.css` | aktualisiert (Pills, Attribution-Block) |
+| `/var/www/api.steemapps.com/{index,node,regions,stats,outages}.html` | aktualisiert (Sources-Nav-Link) |
+| `/opt/steemapps-api-monitor/data/measurements.sqlite` | unverändert (Schema-Migration nur additive `participants`-Tabelle) |
+
+### Backups
+
+| Pfad | Inhalt | MD5 (sample) |
+|---|---|---|
+| `/opt/steemapps-api-monitor/data/measurements.sqlite.pre-etappe8.bak` | DB vor Cutover (1.282.048 B, 5.970 Zeilen) | `1499e046…` |
+| `/opt/steemapps-api-monitor/{api,config,database}.py.pre-etappe8.bak` | Python-Files vor Etappe 8 | siehe Cutover-Log |
+| `/opt/steemapps-api-monitor/requirements.txt.pre-etappe8.bak` | Vor bcrypt-Ergänzung | `fa31677c…` |
+| `/etc/systemd/system/steemapps-api-monitor.service.pre-etappe8.bak` | Vor EnvironmentFile=-Patch | `348b3440…` |
+| `<server>:<backup-path>/etappe8-www-pre.tar.gz` | Komplett-tar des `/var/www/api.steemapps.com/` (201.916 B) | `9e838674…` |
+
+### Restart-Metriken
+
+- **Downtime: 226 ms** (`systemctl restart` Wall-Time, gemessen mit `date +%s%N`)
+- Kein Tick verpasst — Pre-Restart 5.990 Zeilen → Post-Restart 6.000 Zeilen (+10 in einem Tick) → 5 Min später 6.010
+- PID 302121 → 659942
+- `participants`-Tabelle bei erstem `initialise()`-Call angelegt (CREATE TABLE IF NOT EXISTS, idempotent)
+- NRestarts=0 seit Boot — kein Crash-Loop
+
+### Smoke-Test (auf dem Server, gegen Loopback)
+
+| Schritt | Erwartung | Tatsächlich |
+|---|---|---|
+| `curl /api/v1/admin/participants` ohne Bearer | 401 | 401 |
+| `curl /api/v1/admin/participants` mit korrektem Bearer | 200 + leere Liste | `{"participants":[]}` |
+| `POST /admin/participants` `smoke-test-mock` | 201 + plain api_key | 201, key prefix `sapk_3U-…` |
+| `POST /ingest` mit Mock-Key, 3 Messungen | accepted=3 | `{"accepted":3,"rejected":[],"rate_limit_remaining":97}` |
+| `GET /sources` | Mock + Primary | beide gelistet, Mock mit 24h=3 |
+| `POST /ingest` mit `sapk_definitely-fake` | 401 | 401 |
+| `DELETE /admin/participants/1` | 200 | `{"deleted":true,"id":1}` |
+| Mock-Mess-Zeilen entfernt aus DB | 3 entfernt | 3 entfernt |
+| `GET /sources` final | nur Primary | `sources count: 1` |
+
+### External Smoke (von Entwickler-Workstation gegen `api.steemapps.com`)
+
+| URL | HTTP |
+|---|---|
+| `GET https://api.steemapps.com/api/v1/sources` | 200 (Primary, 6010 Messungen) |
+| `GET https://api.steemapps.com/api/v1/nodes` | 200 (10 Nodes) |
+| `POST https://api.steemapps.com/api/v1/ingest` mit leerem Body | 422 (Pydantic-Validation, korrekt) |
+| `GET https://api.steemapps.com/sources.html` | 200 (2.726 B) |
+| `GET https://api.steemapps.com/api/v1/status` | 200 |
+| `GET https://api.steemapps.com/api/v1/regions` | 200 |
+| `GET https://api.steemapps.com/api/v1/outages` | 200 |
+
+### Browser-Test (claude-in-chrome, gegen Live-Site)
+
+- `https://api.steemapps.com/sources.html`: Tabelle mit Primary-Eintrag (greece-lover, "central monitor"-Pill, "Welako VM (DE)", eu-central, 6010/6010), Attribution-Footer mit verlinktem `@greece-lover (eu-central)`, keine Console-Errors
+- `https://api.steemapps.com/index.html`: Nav um "Sources"-Link erweitert, Overview rendert weiter normal mit allen 10 Node-Cards, keine Console-Errors
+
+### Tabu-Verifikation
+
+| Bereich | Vorher | Nachher | Diff |
+|---|---|---|---|
+| Docker-Container (mailcow+neonblocks+steemauth) | 24 | 24 | identisch |
+| Nginx sites-enabled | 12 | 12 | identisch |
+| `nginx -t` | OK | OK | — |
+| `https://steemapps.com/` | HTTP 200 | HTTP 200 | — |
+| `https://welako.app/` | HTTP 200 | HTTP 200 | — |
+| `https://neonblocks.steemapps.com/` | HTTP 200 | HTTP 200 | — |
+
+Mailcow-`netfilter`-Container war bei Post-Check 4 Min alt — periodischer Restart, **nicht** durch unseren Deploy verursacht (kein Touch von /opt/mailcow*).
+
+### Live-URLs nach Cutover
+
+- `https://api.steemapps.com/sources.html` — neue Sources-Seite
+- `https://api.steemapps.com/api/v1/sources` — JSON-API für Mess-Quellen
+- `https://api.steemapps.com/api/v1/nodes` — Node-Liste für Participant-Bootstrap
+- `https://api.steemapps.com/api/v1/ingest` — Ingest-Endpoint (POST, X-API-Key)
+- `https://api.steemapps.com/api/v1/admin/participants` — Admin-CRUD (Bearer-Auth)
+
+### Admin-Token
+
+Generiert auf dem Server mit `openssl rand -hex 32`, geschrieben in
+`/opt/steemapps-api-monitor/.env.local`. Datei ist mode 600, Eigentümer
+`steemapps-monitor`. Wert wurde **nicht** über den Chat übertragen.
+Abrufbar per:
+
+```bash
+ssh root@REDACTED-IP 'cat /opt/steemapps-api-monitor/.env.local'
+```
+
+### Rollback-Pfad (falls je nötig)
+
+```bash
+ssh root@REDACTED-IP
+
+# 1) Service stoppen
+systemctl stop steemapps-api-monitor
+
+# 2) Python-Code zurückspielen
+sudo -u steemapps-monitor bash -c '
+  cd /opt/steemapps-api-monitor
+  for f in api config database requirements; do
+    cp -v ${f}.{py,txt}.pre-etappe8.bak ${f}.${f##*.}
+  done
+  rm ingest.py participants.py
+'
+
+# 3) DB zurückspielen NUR bei Verdacht auf Datenkorruption
+#    (Etappe 8 hat NUR additive participants-Tabelle angelegt;
+#     bestehende Mess-Daten sind unverändert)
+# sudo -u steemapps-monitor cp /opt/steemapps-api-monitor/data/measurements.sqlite{.pre-etappe8.bak,}
+
+# 4) systemd-Unit zurückspielen
+cp /etc/systemd/system/steemapps-api-monitor.service.pre-etappe8.bak \
+   /etc/systemd/system/steemapps-api-monitor.service
+systemctl daemon-reload
+
+# 5) Frontend zurückspielen
+rm -rf /var/www/api.steemapps.com.broken
+mv /var/www/api.steemapps.com /var/www/api.steemapps.com.broken
+mkdir /var/www/api.steemapps.com
+tar -C /var/www/api.steemapps.com -xzf <server>:<backup-path>/etappe8-www-pre.tar.gz --strip-components=1
+chown -R www-data:www-data /var/www/api.steemapps.com
+
+# 6) bcrypt im venv lassen (schadet nicht) ODER:
+# sudo -u steemapps-monitor /opt/steemapps-api-monitor/.venv/bin/pip uninstall -y bcrypt
+
+# 7) Service starten
+systemctl start steemapps-api-monitor
+systemctl is-active steemapps-api-monitor
+```
+
+Tabu-Container und nginx-Sites bleiben in jeder Rollback-Variante
+unberührt.
+
+## Server-Stand (vor Cutover, jetzt obsolet — historisch)
+
+**Etappe 7 war Stand auf dem production-server.** Cutover-Schritte (siehe oben für
+das tatsächlich Durchgeführte):
 
 ```bash
 # 1. Code-Transfer (tar | ssh) wie in Etappe 7
