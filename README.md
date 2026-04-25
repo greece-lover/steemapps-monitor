@@ -26,9 +26,12 @@ This project fills that gap with a Python service that measures every known Stee
 
 ## Status
 
-Live in production. The monitor runs continuously on a single European location, with a public dashboard at https://api.steemapps.com and a daily summary post on Steemit by @steem-api-health. See [ROADMAP.md](ROADMAP.md) for what's next.
+Live in production. The monitor runs continuously, with a public dashboard at https://api.steemapps.com and a daily summary post on Steemit by @steem-api-health.
 
-Open contributions for distributed measurements: see [docs/PARTICIPATE.md](docs/PARTICIPATE.md).
+**Want to contribute measurements from your region?**  
+Self-service onboarding at https://api.steemapps.com/join.html — fill the form, get an API key, run the participant script. Everything you need is on that page including Docker quick-start, FAQ, and resources.
+
+See [docs/PARTICIPATE.md](docs/PARTICIPATE.md) for the full participation guide.
 
 ## Quick start
 

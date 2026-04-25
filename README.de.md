@@ -26,9 +26,12 @@ Dieses Projekt schließt diese Lücke mit einem Python-Dienst, der jeden bekannt
 
 ## Status
 
-Live im Produktivbetrieb. Der Monitor läuft kontinuierlich von einem europäischen Standort, mit öffentlichem Dashboard auf https://api.steemapps.com und täglicher Zusammenfassung auf Steemit durch @steem-api-health. Siehe [ROADMAP.de.md](ROADMAP.de.md) für die nächsten Schritte.
+Live im Produktivbetrieb. Der Monitor läuft kontinuierlich, mit öffentlichem Dashboard auf https://api.steemapps.com und täglicher Zusammenfassung auf Steemit durch @steem-api-health.
 
-Mitmach-Möglichkeit für verteilte Messungen: siehe [docs/TEILNEHMEN.md](docs/TEILNEHMEN.md).
+**Du willst Messungen aus deiner Region beitragen?**  
+Self-Service-Anmeldung unter https://api.steemapps.com/join.html — Formular ausfüllen, API-Key bekommen, Skript laufen lassen. Alles was du brauchst ist auf dieser Seite, inklusive Docker-Quickstart, FAQ und Resources.
+
+Siehe [docs/TEILNEHMEN.md](docs/TEILNEHMEN.md) für den vollständigen Teilnahme-Guide.
 
 ## Schnellstart
 
