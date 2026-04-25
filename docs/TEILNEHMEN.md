@@ -54,7 +54,7 @@ ausgehende JSON-RPC-Calls zu den öffentlichen Nodes.
    [README im participant/-Verzeichnis](../participant/README.md).
 
 3. **Verifizieren.**
-   Nach ca. 10 Minuten siehst du Flush-Log-Zeilen vom Skript und einen
+   Nach 5–10 Minuten siehst du Flush-Log-Zeilen vom Skript und einen
    `24h`-Count > 0 für deinen Steem-Handle auf
    <https://api.steemapps.com/sources.html>.
 
@@ -123,6 +123,27 @@ Nein. Repo aktualisieren, Container neu bauen oder Service neu starten.
 Ja. `monitor.py` ist eine einzige Python-Datei mit ca. 200 Zeilen — in
 unter fünf Minuten lesbar. Das Wire-Format ist in [docs/API.md](API.md)
 unter `POST /api/v1/ingest` dokumentiert.
+
+**Build schlägt mit "No matching distribution found" fehl?**
+Auf Ubuntu mit `systemd-resolved` (Default seit 18.04) zeigt
+`/etc/resolv.conf` auf `127.0.0.53`, was im Docker-Build-Sandbox nicht
+erreichbar ist. Lege eine `docker-compose.override.yml` neben
+`docker-compose.yml` an:
+
+```yaml
+services:
+  participant:
+    build:
+      context: .
+      network: host
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+```
+
+Alternativ system-weit: `/etc/docker/daemon.json` mit
+`{"dns": ["1.1.1.1", "8.8.8.8"]}`, dann
+`sudo systemctl restart docker`.
 
 ## Kontakt
 
