@@ -21,6 +21,7 @@ import argparse
 import json
 import random
 import sys
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -29,7 +30,7 @@ import config as monitor_config
 import database
 import logger as logger_mod
 
-from reporter import aggregation, broadcast, query, template
+from reporter import aggregation, broadcast, image_generator, observations, query, template
 from reporter.config import MODE_DEV, MODE_PROD, ReporterConfig, load
 
 
@@ -44,9 +45,43 @@ def _parse_day(s: str) -> date:
 
 
 def _force_dev(cfg: ReporterConfig) -> ReporterConfig:
-    """Return a copy of cfg with mode forced to dev."""
+    """Return a copy of cfg with mode forced to dev.
+
+    Also redirects the image output to a tmp directory and clears the
+    public URL — a dry-run must never embed a path the public cannot
+    actually fetch."""
     from dataclasses import replace
-    return replace(cfg, mode=MODE_DEV)
+    tmp = Path(tempfile.gettempdir()) / "steemapps-reports"
+    return replace(cfg, mode=MODE_DEV, image_dir=tmp, image_url_base=None)
+
+
+def _build_per_node(cfg: ReporterConfig, day: date, nodes_map: dict[str, Optional[str]]) -> dict[str, aggregation.NodeStats]:
+    """Aggregate one UTC day. Returns {} when the window has no data."""
+    s, e = query.utc_day_window(day)
+    rows = query.fetch_measurements_in_window(cfg.db_path, s, e)
+    if not rows:
+        return {}
+    grouped = query.group_by_node(rows)
+    return {
+        url: aggregation.aggregate_node(rs, url=url, region=nodes_map.get(url))
+        for url, rs in grouped.items()
+    }
+
+
+def _build_week_history(
+    cfg: ReporterConfig, day: date, nodes_map: dict[str, Optional[str]]
+) -> list[dict[str, aggregation.NodeStats]]:
+    """Per-day aggregates for the seven days before `day`, oldest first.
+
+    Days that yielded zero rows are skipped — the observation engine
+    treats anything shorter than WEEK_HISTORY_MIN_DAYS as "not enough
+    history" and silently omits the week-anchored items."""
+    out = []
+    for offset in range(7, 0, -1):
+        per_node = _build_per_node(cfg, day - timedelta(days=offset), nodes_map)
+        if per_node:
+            out.append(per_node)
+    return out
 
 
 def _load_nodes_map() -> dict[str, Optional[str]]:
@@ -54,10 +89,14 @@ def _load_nodes_map() -> dict[str, Optional[str]]:
     return {n["url"]: n.get("region") for n in monitor_config.load_nodes()}
 
 
-def run(day_arg: Optional[str], force_dry_run: bool) -> int:
-    """Main orchestration. Returns a shell exit code."""
+def run(day_arg: Optional[str], force_dry_run: bool, image_only: bool = False) -> int:
+    """Main orchestration. Returns a shell exit code.
+
+    `image_only` skips both broadcasts and the markdown render; it just
+    generates the cover PNG and prints its path. Used by the local
+    preview workflow."""
     cfg = load()
-    if force_dry_run:
+    if force_dry_run or image_only:
         cfg = _force_dev(cfg)
     logger_mod.setup()
 
@@ -86,6 +125,18 @@ def run(day_arg: Optional[str], force_dry_run: bool) -> int:
         )
     global_stats = aggregation.aggregate_global(per_node, rows_by_node)
 
+    # Cover image — generate before anything that talks to the chain so a
+    # broken Pillow path fails the run early, not after a custom_json hit.
+    image_path = cfg.image_dir / f"{day_str}.png"
+    image_generator.render_daily_image(day=day_str, per_node=per_node, output_path=image_path)
+    log.info("cover image written: %s", image_path)
+    cover_url = f"{cfg.image_url_base}/{day_str}.png" if cfg.image_url_base else None
+
+    if image_only:
+        # Print the path so the caller can `open` / `xdg-open` it.
+        print(str(image_path))
+        return 0
+
     # Week-over-week — pull the seven-day windows on each side.
     cur_start, _ = query.utc_day_window(day - timedelta(days=6))
     _, cur_end = query.utc_day_window(day)
@@ -97,6 +148,17 @@ def run(day_arg: Optional[str], force_dry_run: bool) -> int:
         query.group_by_node(cur_rows),
         query.group_by_node(prev_rows),
     )
+
+    # Observations — yesterday + the seven prior days for trend analysis.
+    yesterday_per_node = _build_per_node(cfg, day - timedelta(days=1), nodes_map) or None
+    week_history = _build_week_history(cfg, day, nodes_map)
+    obs_list = observations.gather_observations(
+        per_node, global_stats,
+        yesterday_per_node=yesterday_per_node,
+        week_history=week_history,
+    )
+    log.info("observations: %d generated (categories: %s)",
+             len(obs_list), ", ".join(o.category for o in obs_list))
 
     # Build the `custom_json` payload up-front — it does not depend on any
     # chain reference, so it can go out first.
@@ -119,7 +181,10 @@ def run(day_arg: Optional[str], force_dry_run: bool) -> int:
         log.error("custom_json broadcast failed: %s", exc)
         return 3
 
-    chain_ref = broadcast.to_chain_reference(custom_json_result)
+    # Dev mode: the broadcast wrapper returns a placeholder ref; pass None
+    # so the template falls back to "transaction in this report's broadcast
+    # log" rather than embedding the dummy 'dry-run-custom-json' string.
+    chain_ref = None if cfg.is_dev else broadcast.to_chain_reference(custom_json_result)
 
     # Step 2 — comment. Renders with the live tx hash so the post body
     # contains a precise pointer to the on-chain raw data.
@@ -130,6 +195,7 @@ def run(day_arg: Optional[str], force_dry_run: bool) -> int:
         per_node=per_node,
         global_stats=global_stats,
         week=week,
+        observations=obs_list,
         source_location=monitor_config.SOURCE_LOCATION,
         app_name=cfg.app_name,
         tags=cfg.tags,
@@ -137,6 +203,8 @@ def run(day_arg: Optional[str], force_dry_run: bool) -> int:
         dashboard_url=cfg.dashboard_url,
         witness_url=cfg.witness_url,
         methodology_url=cfg.methodology_url,
+        custom_json_id=cfg.custom_json_id,
+        cover_image_url=cover_url,
         chain_reference=chain_ref,
     )
 
@@ -234,12 +302,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="force dev mode (no chain transactions)")
     ap.add_argument("--seed-synthetic", action="store_true",
                     help="populate the local DB with 14 days of demo data")
+    ap.add_argument("--image-only", action="store_true",
+                    help="generate the cover PNG only and print its path; no broadcast")
     args = ap.parse_args(argv)
 
     if args.seed_synthetic:
         _seed_synthetic(monitor_config.DB_PATH)
         return 0
-    return run(day_arg=args.date, force_dry_run=args.dry_run)
+    return run(day_arg=args.date, force_dry_run=args.dry_run, image_only=args.image_only)
 
 
 if __name__ == "__main__":

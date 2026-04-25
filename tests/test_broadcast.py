@@ -37,6 +37,8 @@ def _cfg(mode: str = MODE_DEV, retries: int = 3, retry_sleep_s: int = 0) -> Repo
         db_path=Path("test.sqlite"),
         broadcast_retry_count=retries,
         broadcast_retry_sleep_s=retry_sleep_s,
+        image_dir=Path("test-reports"),
+        image_url_base=None,
     )
 
 

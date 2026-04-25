@@ -3,3 +3,6 @@
 # requirements.txt so the monitor service's footprint doesn't change;
 # installed on the VM alongside the reporter unit.
 beem>=0.24.26,<0.30
+# Pillow renders the daily cover PNG (Etappe 9). Pure-Python C extensions,
+# no system fonts required (uses bundled DejaVu fallback when needed).
+Pillow>=10,<12

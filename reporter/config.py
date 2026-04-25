@@ -37,6 +37,12 @@ class ReporterConfig:
     db_path: Path
     broadcast_retry_count: int
     broadcast_retry_sleep_s: int
+    # Where the daily cover image is written and how the post body
+    # references it. The defaults assume the production webroot; dry-run
+    # callers override `image_dir` to a tmp path and `image_url_base` to
+    # None so the post does not point at a non-public file path.
+    image_dir: Path
+    image_url_base: Optional[str]
 
     @property
     def is_dev(self) -> bool:
@@ -108,4 +114,12 @@ def load(env_file: Path | None = None) -> ReporterConfig:
         db_path=Path(os.environ.get("STEEMAPPS_REPORTER_DB_PATH", str(monitor_config.DB_PATH))),
         broadcast_retry_count=int(os.environ.get("STEEMAPPS_REPORTER_RETRY", "3")),
         broadcast_retry_sleep_s=int(os.environ.get("STEEMAPPS_REPORTER_RETRY_SLEEP", "60")),
+        image_dir=Path(os.environ.get(
+            "STEEMAPPS_REPORTER_IMAGE_DIR",
+            "/var/www/api.steemapps.com/reports",
+        )),
+        image_url_base=os.environ.get(
+            "STEEMAPPS_REPORTER_IMAGE_URL_BASE",
+            "https://api.steemapps.com/reports",
+        ) or None,
     )
