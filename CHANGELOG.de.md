@@ -48,13 +48,21 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Entwurf)". Vor Veröffentlichung vom Autor zu redigieren.
 
-### Noch offen für Cutover auf den production-server
+### Cutover auf den Produktions-Server (live seit 2026-04-25 04:06 UTC)
 
-- `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` setzen (file mode 600, Eigentümer `steemapps-monitor`)
-- bcrypt im Server-venv nachinstallieren: `.venv/bin/pip install "bcrypt>=4.2,<5"`
-- Frontend-Dateien (sources.html, sources.js, aktualisierte CSS, gepatchte HTML-Pages) nach `/var/www/api.steemapps.com/`
-- Service-Restart, Smoke-Test gegen `/api/v1/sources` und `/api/v1/admin/participants` (letzteres mit korrektem Bearer-Token muss 200 mit leerer Liste liefern, ohne Token 401)
-- Aufruf-Post nach Review veröffentlichen
+- Service-Restart in **226 ms** Wall-Time, kein Tick verpasst (5.990 → 6.000 Zeilen +10 in einem Tick)
+- `participants`-Tabelle automatisch beim Start angelegt (`CREATE TABLE IF NOT EXISTS`, idempotent)
+- `bcrypt 4.3.0` im venv nachinstalliert
+- `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` (mode 600, owner steemapps-monitor) — Wert separat per SSH abrufbar, nicht im Repo
+- systemd-Unit um `EnvironmentFile=-/opt/steemapps-api-monitor/.env.local` erweitert (Dash-Prefix = optional)
+- Smoke-Test mit Mock-Teilnehmer (POST → ingest 3 Zeilen → in `/sources` sichtbar → DELETE) erfolgreich
+- Tabu-Verifikation: 24 Container und 12 nginx-Sites identisch zum Pre-Flight-Stand, alle Schwesterdomains weiter HTTP 200
+- Live unter `https://api.steemapps.com/sources.html` und `/api/v1/{ingest,sources,nodes,admin/participants}`
+- Backup-Pfade unter `/opt/steemapps-api-monitor/*.pre-etappe8.bak` und `<server>:<backup-path>/etappe8-www-pre.tar.gz`; Rollback-Rezept in `progress/2026-04-25-phase6-etappe8.md`
+
+### Noch offen
+
+- Aufruf-Post nach Review veröffentlichen (sobald Repo öffentlich)
 
 ### Noch offen für Phase-5-Produktions-Cutover
 
