@@ -990,6 +990,84 @@ a.node-card:hover { border-color: var(--accent-dim); }
   min-height: 18px;
 }
 
+/* Body copy in join sections — paragraphs and lists. The default body
+   color sits on the brighter --text variable; we want a slightly less
+   dominant look so that the section titles still lead the eye. */
+.join-step p {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+.join-step p:last-child { margin-bottom: 0; }
+
+.join-step a { color: var(--accent); }
+
+/* Inline <code>: a tinted pill on the deeper background so it pops out
+   of running text without shouting. Pre blocks (below) override these
+   rules so the wrapped code looks like a normal terminal paste. */
+.join-step code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--accent);
+}
+
+.join-pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 10px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+}
+.join-step .join-pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.faq-item { margin-bottom: 18px; }
+.faq-item:last-child { margin-bottom: 0; }
+.faq-item h3 {
+  font-family: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px 0;
+  letter-spacing: 0;
+}
+.faq-item p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.resources-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.resources-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.resources-list li:last-child { border-bottom: 0; }
+.resources-list a { color: var(--accent); }
+
 /* ---------- Mobile ---------- */
 
 /* ---------- Tablet (≤ 768 px) ---------- */
