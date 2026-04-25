@@ -32,6 +32,11 @@ class NodeStats:
     # Keys are the free-text error_message strings the monitor writes
     # (`timeout`, `HTTP 502`, `rpc_error: …`, etc.); values are counts.
     error_classes: dict[str, int] = field(default_factory=dict)
+    # Number of distinct source_location values that contributed measurements
+    # for this node within the window. Used by the report template to label
+    # latency as "X ms (avg of N sources)" once external participants come
+    # online; for the single-source baseline it stays at 1.
+    source_count: int = 1
 
 
 @dataclass(frozen=True)
@@ -105,6 +110,7 @@ def aggregate_node(rows: list[dict], url: str, region: Optional[str]) -> NodeSta
             msg = (r["error_message"] or "unknown")
             bucket = _error_bucket(msg)
             classes[bucket] = classes.get(bucket, 0) + 1
+    sources = {r.get("source_location") for r in rows if r.get("source_location") is not None}
     return NodeStats(
         url=url,
         region=region,
@@ -114,6 +120,7 @@ def aggregate_node(rows: list[dict], url: str, region: Optional[str]) -> NodeSta
         errors=errors,
         latency=lat,
         error_classes=classes,
+        source_count=max(1, len(sources)),
     )
 
 
@@ -285,6 +292,7 @@ def to_custom_json_payload(
                     "p95": s.latency.p95_ms,
                 },
                 "error_classes": s.error_classes,
+                "source_count": s.source_count,
             }
             for s in sorted(per_node.values(), key=lambda x: x.url)
         ],

@@ -7,6 +7,45 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 ## [Unveröffentlicht]
 
+## [Phase 6 Etappe 9] — 2026-04-25
+
+### Neu
+
+- `reporter/observations.py` — Beobachtungs-Engine mit acht Kategorien (`top_performer`, `laggard`, `latency_change`, `new_outage`, `consistent_leader`, `consistent_laggard`, `global_trend`, `biggest_outage`). Kategorien mit fehlenden Voraussetzungen (z. B. keine Vortags-Daten) werden leise übersprungen — keine Fake-Vergleiche im Post
+- `reporter/image_generator.py` — Pillow-basierter PNG-Renderer für das tägliche Cover-Bild (1200×675, brand-konform: dunkler Verlauf, lime Akzent, "FASTEST"/"SLOWEST"-Tiles)
+- `scripts/dry_run_daily_report.py` — End-to-End-Preview gegen 14 Tage Synthetik-Daten in einer tmp-DB
+- `tests/test_observations.py` (18 Tests), `tests/test_image_generator.py` (3 Tests), `tests/test_aggregation_etappe9.py` (4 Tests)
+
+### Geändert
+
+- `reporter/template.py` — komplett auf Englisch umgestellt (keine deutsche Sektion mehr im Post). Neue Reihenfolge laut Spec: Cover-Bild → Executive Summary → Perspective-Notice → Observations → Detail-Tabelle → Biggest-Outage → W-o-W → Methodology → Participation-Block → Feedback → Resources → Footer
+- `reporter/aggregation.py` — `NodeStats.source_count` zählt unique `source_location`-Werte pro Node-Window; im `custom_json`-Payload mit ausgegeben. Multi-Source-Latenz-Label `(avg of N sources)` schaltet sich automatisch ab N≥2 ein
+- `reporter/config.py` — `image_dir`- und `image_url_base`-Felder (ENV-overridable). Defaults zeigen auf den Produktions-Webroot
+- `reporter/daily_report.py` — Image-Generation **vor** dem Chain-Broadcast (Fail-fast bei Pillow-Problemen). Hookup für Observations und Multi-Source-Logik. Neuer `--image-only`-Flag für Cover-Preview ohne Broadcast
+- `requirements-reporter.txt` — `Pillow>=10,<12`
+
+### Plan-Korrekturen vor Commit (nach erstem Dry-Run-Review)
+
+- Executive Summary von "Beobachtungen wiederholen" auf reine Headline-Zahlen reduziert (Uptime, Mess-Count, Median-Latenz). Spezifika nur noch in der Bullet-Liste
+- Beobachtungs-Bullets von `↑/↓`-Pfeilen auf `**Label:**`-Bold-Prefix umgestellt — passt zum technischen Voice und vermeidet Unicode-Render-Risiko bei Steemit
+- Perspective-Notice: das zu optimistische "first community contributors are now being onboarded" durch "Want to contribute measurements from your region? See the participation block below." ersetzt
+- W-o-W-Format: exakte Null-Deltas erscheinen als `±0.00 pp` statt als `+-0.00 pp` (float-Arithmetik mit `-0.0` als Quelle)
+
+### Lokal verifiziert
+
+- 151/151 pytest grün (+33 vs Etappe 8, keine Regressionen)
+- `scripts/dry_run_daily_report.py`: 14 Tage Synthetik → 9 Beobachtungen für den Vortag, sauberes Cover-PNG (38 KB), 5,5 KB Markdown-Body in korrekter Sektion-Reihenfolge
+
+### Noch offen für Cutover auf den Produktions-Server
+
+- Code-Transfer per `tar | ssh`
+- `Pillow>=10,<12` ins Reporter-venv installieren
+- `/var/www/api.steemapps.com/reports/`-Verzeichnis anlegen, www-data-Ownership
+- `--image-only` Smoke-Test
+- Voller Dry-Run gegen Live-DB mit dem heutigen Datum, Output zur Freigabe vorlegen
+- Erster echter Broadcast manuell triggern (Posting-Key vom Autor selbst per SSH in `.env.local` eingetragen, nicht via Chat)
+- Timer aktivieren, sobald der erste echte Post auf steemit.com verifiziert ist
+
 ## [Phase 6 Etappe 8] — 2026-04-25
 
 ### Neu
