@@ -46,6 +46,19 @@ _PERMANENT_ERROR_HINTS = (
 )
 
 
+# Default Steem RPC endpoints for the broadcast. beem's built-in default
+# node list points at Hive nodes (the two libraries share lineage), and
+# without an explicit node= argument we silently end up on Hive — which
+# does not have the Steem accounts we sign with. Pin a small fallback
+# list of Steem RPC endpoints here; the config layer lets ops override
+# via STEEMAPPS_REPORTER_STEEM_NODES.
+DEFAULT_STEEM_NODES = [
+    "https://api.steemit.com",
+    "https://api.justyy.com",
+    "https://steemd.steemworld.org",
+]
+
+
 class BroadcastError(RuntimeError):
     """Raised when the broadcast attempts are exhausted."""
 
@@ -100,7 +113,8 @@ def _build_steem(cfg: ReporterConfig):
             "STEEMAPPS_REPORTER_POSTING_KEY is empty — refusing to broadcast"
         )
     from beem import Steem  # type: ignore[import-not-found]
-    return Steem(keys=[cfg.posting_key])
+    nodes = cfg.steem_nodes or DEFAULT_STEEM_NODES
+    return Steem(node=list(nodes), keys=[cfg.posting_key])
 
 
 def _broadcast_custom_json_real(cfg: ReporterConfig, payload: dict) -> BroadcastResult:
