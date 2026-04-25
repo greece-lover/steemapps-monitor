@@ -8,7 +8,7 @@ This describes the production deployment of the monitor, API server, and daily r
 - Non-root user `steemapps-monitor` (create with `adduser --system --group --home /opt/steemapps-monitor steemapps-monitor` if this is a new host).
 - Reverse proxy (nginx) in front of the JSON API, terminating TLS for `api.steemapps.com`.
 
-During development, everything runs on the author's local Ubuntu VM at `/opt/steemapps-monitor/`; production target is a separate server (IONOS, per the concept).
+During development, everything runs on the author's local Ubuntu VM at `/opt/steemapps-monitor/`; production target is a separate production server.
 
 ## Directory layout on the server
 

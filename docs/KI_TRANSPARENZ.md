@@ -16,7 +16,7 @@ Dieses Projekt wird mit Unterstützung eines KI-Assistenten (Claude Code, Anthro
 
 - Keine Chain-Operationen mit echten Keys im Rahmen der Entwicklung. Der Reporter-Account-Key wird ausschließlich durch den Autor in `.env.local` hinterlegt; die KI sieht ihn nicht und benutzt ihn nicht.
 - Keine eigenmächtige Veröffentlichung des Repositories (Privat-Switch zu Public bleibt menschliche Entscheidung).
-- Keine Installation oder Konfigurations-Änderung auf Produktions-Servern ohne explizite Freigabe. Das galt besonders in Phase 1, als der Status des IONOS-Servers noch nicht geklärt war.
+- Keine Installation oder Konfigurations-Änderung auf Produktions-Servern ohne explizite Freigabe. Das galt besonders in Phase 1, als der Status des Produktions-Servers noch nicht geklärt war.
 - Keine Änderungen an der Messmethodik ohne dokumentierte Begründung und vorherige Abstimmung.
 - Keine Übertragung von Nutzer-Daten an Anthropic oder Dritte — die KI sieht nur den Projekt-Code und vom Autor bereitgestellten Kontext.
 
@@ -26,4 +26,4 @@ Die Messmethodik ist bewusst so gestaltet, dass sie ohne KI reproduzierbar ist. 
 
 ## Progress-Log
 
-Jede Entwicklungsphase wird in `progress/YYYY-MM-DD-phase-*.md` dokumentiert. Zeitstempel, Schritte, Entscheidungen und offene Punkte werden dort festgehalten, damit der Arbeitsverlauf auch nachträglich nachvollziehbar ist.
+Jede Entwicklungsphase wird in internen Phasen-Logs dokumentiert. Zeitstempel, Schritte, Entscheidungen und offene Punkte werden dort festgehalten, damit der Arbeitsverlauf auch nachträglich nachvollziehbar ist.

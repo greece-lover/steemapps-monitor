@@ -44,17 +44,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - `scripts/dry_run_participant.py` succeeded: mock participant registered, three measurements ingested, correctly persisted with `display_label` in the DB, counted in `/api/v1/sources`
 - Participant script: syntax compile OK, 177 effective lines of code (under the spec's 200-line guideline)
 
-### Cutover on the production server (live since 2026-04-25 04:06 UTC)
+### Cutover on production server (live since 2026-04-25 04:06 UTC)
 
 - Service restart in **226 ms** wall time; no tick missed (5,990 → 6,000 rows +10 in one tick)
 - `participants` table created on first startup via `CREATE TABLE IF NOT EXISTS` (idempotent)
 - `bcrypt 4.3.0` installed into the server venv
-- `STEEMAPPS_ADMIN_TOKEN` written to `/opt/steemapps-api-monitor/.env.local` (mode 600, owner steemapps-monitor) — value retrievable via SSH, not in repo
-- systemd unit gained `EnvironmentFile=-/opt/steemapps-api-monitor/.env.local` (dash prefix = optional)
+- `STEEMAPPS_ADMIN_TOKEN` written to `<production-path>/.env.local` (mode 600, owner steemapps-monitor) — value retrievable via SSH, not in repo
+- systemd unit gained `EnvironmentFile=-<production-path>/.env.local` (dash prefix = optional)
 - End-to-end smoke test with mock participant succeeded (POST → ingest 3 rows → visible in `/sources` → DELETE)
 - Tabu verification: 24 containers and 12 nginx sites unchanged from the pre-flight baseline, all sister domains still HTTP 200
 - Live at `https://api.steemapps.com/sources.html` and `/api/v1/{ingest,sources,nodes,admin/participants}`
-- Backups under `/opt/steemapps-api-monitor/*.pre-etappe8.bak` and `<server>:<backup-path>/etappe8-www-pre.tar.gz`; rollback recipe in `progress/2026-04-25-phase6-etappe8.md`
+- Backups under `<production-path>/*.pre-etappe8.bak` and `<server>:<backup-path>/etappe8-www-pre.tar.gz`; rollback recipe kept in internal deployment notes
 
 ### Still pending
 
@@ -79,7 +79,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - `deploy/README.md` — reporter install, dry-run, and manual-trigger instructions
 - `docs/DAILY-REPORT.md` + `docs/TAGES-REPORT.md` — methodology, schedule, `custom_json` schema, error-handling semantics, manual-run recipes
 - `tests/test_aggregation.py` (9 tests), `tests/test_template.py` (9 tests), `tests/test_broadcast.py` (7 tests) — new coverage for the reporter layer
-- `progress/2026-04-24-phase5.md` — Phase 5 progress log with dry-run sample
 
 ### Design decisions
 
@@ -113,7 +112,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - `deploy/README.md` — install, update, logs, shutdown commands
 - `tests/` — 18 pytest tests (scoring rules per methodology + database round-trip); plus `tests/smoke_one_tick.py` for a manual live check against the real nodes
 - `requirements.txt` and `requirements-dev.txt`
-- `progress/2026-04-24-phase3.md` — Phase 3 progress log
 
 ### Changed
 
@@ -135,8 +133,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 - Python-focused `.gitignore`
 - SSH host alias for the development VM in the author's SSH config
 - Server working directory `/opt/steemapps-monitor/` on the local development VM (Ubuntu 24.04)
-- `progress/2026-04-24-phase1-bestandsaufnahme.md` — Phase 1 server audit
-- `progress/2026-04-24-phase2.md` — Phase 2 timestamp log
 - Private GitHub repository `greece-lover/steemapps-monitor`
 
 ### Known deviations from concept

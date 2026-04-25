@@ -48,7 +48,7 @@ The repository is private until Phase 7. During the private phase:
 When the repository becomes public, a pre-switch audit will confirm:
 
 - No real keys in history (including git history — use `git log -p | grep -iE 'key|secret|password|pass='`)
-- No customer-specific server hostnames beyond the already-public IONOS address
+- No customer-specific server hostnames beyond the already-public production server address
 - No leftover development paths or internal VM identifiers that should not be public
 
 ## Service hardening

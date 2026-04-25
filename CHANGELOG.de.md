@@ -46,19 +46,19 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 ### Aufruf-Post-Entwurf
 
-Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Entwurf)". Vor Veröffentlichung vom Autor zu redigieren.
+Liegt in den internen Deployment-Notizen, Abschnitt "Aufruf-Post (Entwurf)". Vor Veröffentlichung vom Autor zu redigieren.
 
-### Cutover auf den Produktions-Server (live seit 2026-04-25 04:06 UTC)
+### Cutover auf Produktions-Server (live seit 2026-04-25 04:06 UTC)
 
 - Service-Restart in **226 ms** Wall-Time, kein Tick verpasst (5.990 → 6.000 Zeilen +10 in einem Tick)
 - `participants`-Tabelle automatisch beim Start angelegt (`CREATE TABLE IF NOT EXISTS`, idempotent)
 - `bcrypt 4.3.0` im venv nachinstalliert
-- `STEEMAPPS_ADMIN_TOKEN` in `/opt/steemapps-api-monitor/.env.local` (mode 600, owner steemapps-monitor) — Wert separat per SSH abrufbar, nicht im Repo
-- systemd-Unit um `EnvironmentFile=-/opt/steemapps-api-monitor/.env.local` erweitert (Dash-Prefix = optional)
+- `STEEMAPPS_ADMIN_TOKEN` in `<production-path>/.env.local` (mode 600, owner steemapps-monitor) — Wert separat per SSH abrufbar, nicht im Repo
+- systemd-Unit um `EnvironmentFile=-<production-path>/.env.local` erweitert (Dash-Prefix = optional)
 - Smoke-Test mit Mock-Teilnehmer (POST → ingest 3 Zeilen → in `/sources` sichtbar → DELETE) erfolgreich
 - Tabu-Verifikation: 24 Container und 12 nginx-Sites identisch zum Pre-Flight-Stand, alle Schwesterdomains weiter HTTP 200
 - Live unter `https://api.steemapps.com/sources.html` und `/api/v1/{ingest,sources,nodes,admin/participants}`
-- Backup-Pfade unter `/opt/steemapps-api-monitor/*.pre-etappe8.bak` und `<server>:<backup-path>/etappe8-www-pre.tar.gz`; Rollback-Rezept in `progress/2026-04-25-phase6-etappe8.md`
+- Backup-Pfade unter `<production-path>/*.pre-etappe8.bak` und `<server>:<backup-path>/etappe8-www-pre.tar.gz`; Rollback-Rezept in den internen Deployment-Notizen
 
 ### Noch offen
 
@@ -83,7 +83,6 @@ Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Ent
 - `deploy/README.md` — Install-, Dry-Run- und Manual-Trigger-Anleitung für den Reporter
 - `docs/DAILY-REPORT.md` + `docs/TAGES-REPORT.md` — Methodik, Zeitplan, `custom_json`-Schema, Fehlerbehandlungs-Semantik, manuelle Ausführungs-Rezepte
 - `tests/test_aggregation.py` (9 Tests), `tests/test_template.py` (9 Tests), `tests/test_broadcast.py` (7 Tests) — neue Abdeckung für die Reporter-Schicht
-- `progress/2026-04-24-phase5.md` — Phase-5-Progress-Log mit Dry-Run-Sample
 
 ### Design-Entscheidungen
 
@@ -117,7 +116,6 @@ Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Ent
 - `deploy/README.md` — Install-, Update-, Log- und Shutdown-Kommandos
 - `tests/` — 18 pytest-Tests (Scoring-Regeln gemäß Methodik + Datenbank-Round-Trip); zusätzlich `tests/smoke_one_tick.py` für manuellen Live-Check gegen die echten Nodes
 - `requirements.txt` und `requirements-dev.txt`
-- `progress/2026-04-24-phase3.md` — Phase-3-Progress-Log
 
 ### Geändert
 
@@ -139,8 +137,6 @@ Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Ent
 - Python-orientierte `.gitignore`
 - SSH-Host-Alias für die Entwicklungs-VM in der SSH-Config des Autors
 - Server-Arbeitsverzeichnis `/opt/steemapps-monitor/` auf der lokalen Entwicklungs-VM (Ubuntu 24.04)
-- `progress/2026-04-24-phase1-bestandsaufnahme.md` — Phase-1-Server-Audit
-- `progress/2026-04-24-phase2.md` — Phase-2-Zeitstempel-Log
 - Privates GitHub-Repository `greece-lover/steemapps-monitor`
 
 ### Bekannte Abweichungen vom Konzept
