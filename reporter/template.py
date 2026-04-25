@@ -16,7 +16,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from reporter.aggregation import GlobalStats, NodeStats, WeekComparison
+from reporter.aggregation import (
+    CrossRegionResult,
+    ErrorBreakdown,
+    GlobalStats,
+    HourPattern,
+    LatencyDistribution,
+    NodeStats,
+    PerformanceGap,
+    ReliabilityRanking,
+    WeekComparison,
+)
 from reporter.observations import Observation, make_executive_summary
 
 
@@ -95,10 +105,16 @@ def _bullet(observation: Observation) -> str:
 
 
 def _node_table(per_node: dict[str, NodeStats]) -> str:
-    """All-nodes detail table, sorted by uptime desc then avg latency asc."""
+    """All-nodes detail table, sorted by uptime desc then avg latency asc.
+
+    Latency columns: avg gives the typical-tick number, p50/p95/p99
+    show how heavy the tail is. Two nodes with the same average can
+    have very different feels for users when one's p99 is 5× the
+    other's — those rows now visibly separate themselves.
+    """
     header = (
-        "| Node | Region | Uptime | Avg latency | p95 | Errors | Error classes |\n"
-        "|---|---|---|---|---|---|---|"
+        "| Node | Region | Uptime | Avg | p50 | p95 | p99 | Errors | Error classes |\n"
+        "|---|---|---|---|---|---|---|---|---|"
     )
     def _sort_key(s: NodeStats) -> tuple[float, int]:
         return (-s.uptime_pct, s.latency.avg_ms if s.latency.avg_ms is not None else 10**9)
@@ -110,7 +126,9 @@ def _node_table(per_node: dict[str, NodeStats]) -> str:
             f"| {s.region or '—'} "
             f"| {_format_uptime(s.uptime_pct)} "
             f"| {_format_latency_with_sources(s)} "
+            f"| {_format_latency(s.latency.p50_ms)} "
             f"| {_format_latency(s.latency.p95_ms)} "
+            f"| {_format_latency(s.latency.p99_ms)} "
             f"| {s.errors} "
             f"| {errclass} |"
         )
@@ -239,6 +257,161 @@ def _resources_block(
     )
 
 
+# -----------------------------------------------------------------
+#  Phase 6 Etappe 12a — six additional sections
+# -----------------------------------------------------------------
+#
+# Each section builder follows the same conventions as the existing
+# ones: returns a markdown string, or None when the input is missing /
+# empty. The render() function checks for None before appending so
+# conditional sections quietly drop out of clean-day reports.
+
+
+def _latency_distribution_section(d: Optional[LatencyDistribution]) -> Optional[str]:
+    """One-line summary of how the day's measurements clustered across the
+    response-time bands users actually feel."""
+    if d is None or d.sample_size == 0:
+        return None
+    return (
+        "## Latency distribution\n\n"
+        f"Across {d.sample_size:,} successful measurements today: "
+        f"**{d.pct_under_200ms:.1f} %** under 200 ms, "
+        f"**{d.pct_under_500ms:.1f} %** under 500 ms, "
+        f"**{d.pct_under_1000ms:.1f} %** under 1 000 ms. "
+        f"({d.pct_above_1000ms:.1f} % were slower than 1 second.)"
+    )
+
+
+def _hour_pattern_section(p: Optional[HourPattern]) -> Optional[str]:
+    """Best/worst UTC hour. Skipped when neither bucket has data — that
+    happens on a freshly-started monitor where every hour is empty."""
+    if p is None or p.best is None or p.worst is None:
+        return None
+    if p.best.hour_utc == p.worst.hour_utc:
+        # All measurements landed in the same hour (very short window).
+        return None
+    def _slot(hour: int) -> str:
+        return f"{hour:02d}:00–{(hour + 1) % 24:02d}:00 UTC"
+    return (
+        "## Time-of-day pattern\n\n"
+        f"**Best hour today:** {_slot(p.best.hour_utc)} "
+        f"(avg latency {p.best.avg_latency_ms} ms, {p.best.sample_size} measurements). "
+        f"**Worst hour:** {_slot(p.worst.hour_utc)} "
+        f"(avg latency {p.worst.avg_latency_ms} ms, {p.worst.sample_size} measurements)."
+    )
+
+
+def _error_pattern_section(eb: Optional[ErrorBreakdown]) -> Optional[str]:
+    """Top-3 error types with share of total. Skipped on clean days."""
+    if eb is None or eb.total_errors == 0 or not eb.top:
+        return None
+    parts = [
+        f"`{s.bucket}` ({s.pct:.1f} %)"
+        for s in eb.top
+    ]
+    if len(parts) == 1:
+        body = f"All {eb.total_errors} errors today were {parts[0]}."
+    else:
+        head = ", followed by ".join([parts[0], *parts[1:]])
+        body = (
+            f"Most common error today: {head} "
+            f"(of {eb.total_errors:,} total errors)."
+        )
+    return "## Error pattern\n\n" + body
+
+
+def _performance_gap_section(g: Optional[PerformanceGap]) -> Optional[str]:
+    """Spread between fastest and slowest avg latency, with last-week
+    anchor when available."""
+    if g is None or g.today_factor is None:
+        return None
+    line1 = (
+        f"The fastest node was **{g.today_factor:.2f}× faster** than the slowest today "
+        f"({g.today_fastest_ms} ms vs {g.today_slowest_ms} ms)."
+    )
+    if g.prev_factor is None:
+        line2 = "Previous-week reference is not yet available; the trend line will appear in future reports."
+    else:
+        verb = {
+            "widening":  "widening",
+            "narrowing": "narrowing",
+            "stable":    "stable",
+        }.get(g.trend, "stable")
+        line2 = (
+            f"Last week the same factor was **{g.prev_factor:.2f}×** — the gap is **{verb}**."
+        )
+    return f"## Best vs worst performance gap\n\n{line1} {line2}"
+
+
+def _cross_region_section(cr: Optional[CrossRegionResult]) -> Optional[str]:
+    """Per-node latency by source region. Quiet drop-out when the report
+    has no node seen from at least two regions (the single-source case
+    we expect for a long while)."""
+    if cr is None or not cr.entries:
+        return None
+    header = "| Node | Latency by source region | Variance |\n|---|---|---|"
+    rows = []
+    for e in cr.entries:
+        # Sort regions inside the cell by ascending latency so the cheap
+        # one is always the leftmost label.
+        ordered = sorted(e.by_region.items(), key=lambda kv: kv[1])
+        regions_cell = ", ".join(f"{region} {ms} ms" for region, ms in ordered)
+        rows.append(f"| `{_short_url(e.node_url)}` | {regions_cell} | {e.variance_factor:.2f}× |")
+    return (
+        "## Cross-region latency variance\n\n"
+        "Same node, measured from different geographic locations. A high "
+        "variance factor means users in one region see a noticeably different "
+        "experience than users in another.\n\n"
+        + header + "\n" + "\n".join(rows)
+    )
+
+
+def _reliability_ranking_section(r: Optional[ReliabilityRanking]) -> Optional[str]:
+    """Top/bottom uptime over the available history window. Section
+    headline says how many days the ranking actually covers — a fresh
+    monitor with 7 days of history reads "7-day reliability ranking"
+    instead of pretending it has 30."""
+    if r is None or r.days_actual < 7 or not r.top:
+        return None
+    head = f"## {r.days_actual}-day reliability ranking"
+    top_lines = [
+        f"- {i + 1}. `{_short_url(e.node_url)}` — {e.uptime_pct:.2f} %"
+        for i, e in enumerate(r.top)
+    ]
+    bottom_lines = [
+        f"- {i + 1}. `{_short_url(e.node_url)}` — {e.uptime_pct:.2f} %"
+        for i, e in enumerate(r.bottom)
+    ]
+    streak = ""
+    if r.longest_streak_node and r.longest_streak_days > 0:
+        unit = "day" if r.longest_streak_days == 1 else "days"
+        streak = (
+            f"\n\n**Longest unbroken uptime streak:** "
+            f"`{_short_url(r.longest_streak_node)}` — "
+            f"{r.longest_streak_days} {unit} without a single failed tick."
+        )
+    return (
+        f"{head}\n\n"
+        "**Most reliable**\n\n" + "\n".join(top_lines) + "\n\n"
+        "**Least reliable**\n\n" + "\n".join(bottom_lines)
+        + streak
+    )
+
+
+def _detail_image_section(detail_image_url: Optional[str], day: str) -> Optional[str]:
+    """Inline-link the detail PNG with the same `day` anchor the cover image
+    uses. Dry-runs without an image_url_base pass None and the section
+    drops out — the post body never points at a non-public file path."""
+    if not detail_image_url:
+        return None
+    return (
+        "## Visual detail\n\n"
+        f"![Steem API Health · detail · {day}]({detail_image_url})\n\n"
+        "*Top: latency distribution per node. Middle: hourly performance. "
+        "Bottom: cross-region comparison (when multi-source data is available).*"
+    )
+
+
 def _methodology_one_liner(methodology_url: str) -> str:
     return (
         f"**Methodology:** one `condenser_api.get_dynamic_global_properties` "
@@ -276,6 +449,16 @@ def render(
     custom_json_id: str = "steemapps_api_stats_daily",
     cover_image_url: Optional[str] = None,
     chain_reference: Optional[ChainReference] = None,
+    # Etappe-12a additions — all optional so existing callers and tests
+    # keep working unchanged. A None value drops the corresponding
+    # section quietly from the rendered body.
+    latency_distribution: Optional[LatencyDistribution] = None,
+    hour_pattern: Optional[HourPattern] = None,
+    error_breakdown: Optional[ErrorBreakdown] = None,
+    performance_gap: Optional[PerformanceGap] = None,
+    cross_region: Optional[CrossRegionResult] = None,
+    reliability: Optional[ReliabilityRanking] = None,
+    detail_image_url: Optional[str] = None,
 ) -> RenderedPost:
     """Produce the final post title, permlink, body, and json_metadata.
 
@@ -300,16 +483,39 @@ def render(
     if (obs_block := _observations_section(observations)):
         body_parts.append(obs_block)
 
-    # 5. Detail table.
+    # 5. Detail table (now with p50/p95/p99).
     body_parts.append("## Nodes\n\n" + _node_table(per_node))
 
-    # 6. Biggest outage of the day — conditional.
+    # 6-8. Etappe-12a inserts: distribution → time-of-day → error pattern.
+    # All conditional — quiet drop-out on a clean / empty day.
+    if (block := _latency_distribution_section(latency_distribution)):
+        body_parts.append(block)
+    if (block := _hour_pattern_section(hour_pattern)):
+        body_parts.append(block)
+    if (block := _error_pattern_section(error_breakdown)):
+        body_parts.append(block)
+
+    # 9. Biggest outage of the day — conditional.
     if (out_block := _biggest_outage_section(global_stats)):
         body_parts.append(out_block)
 
-    # 7. Week-over-week — conditional.
+    # 10. Week-over-week — conditional.
     if (week_block := _week_section(week)):
         body_parts.append(week_block)
+
+    # 11-13. Etappe-12a inserts: gap → cross-region → reliability ranking.
+    if (block := _performance_gap_section(performance_gap)):
+        body_parts.append(block)
+    if (block := _cross_region_section(cross_region)):
+        body_parts.append(block)
+    if (block := _reliability_ranking_section(reliability)):
+        body_parts.append(block)
+
+    # 14. Detail image — sits before the methodology one-liner so the
+    # reader has the visual context already when the text moves on to
+    # "what does it all mean".
+    if (block := _detail_image_section(detail_image_url, day)):
+        body_parts.append(block)
 
     # Methodology one-liner sits between the data and the asks so the
     # reader knows what the numbers mean before the "join in" block.
@@ -341,11 +547,12 @@ def render(
 
     body = "\n\n".join(body_parts)
 
+    image_list = [u for u in (cover_image_url, detail_image_url) if u]
     json_metadata = {
         "tags": tags,
         "app": app_name,
         "format": "markdown",
-        "image": [cover_image_url] if cover_image_url else [],
+        "image": image_list,
         "steemapps_monitor": {
             "day": day,
             "window_start": window_start,

@@ -14,7 +14,8 @@ def _ns(url: str, *, avg: int | None, uptime: float = 100.0,
         url=url, region=region, total=100,
         ok=int(100 * uptime / 100), uptime_pct=uptime,
         errors=errors,
-        latency=LatencyStats(avg_ms=avg, min_ms=avg, max_ms=avg, p95_ms=avg),
+        latency=LatencyStats(avg_ms=avg, min_ms=avg, max_ms=avg,
+                             p50_ms=avg, p95_ms=avg, p99_ms=avg),
     )
 
 

@@ -56,7 +56,7 @@ def fetch_measurements_in_window(
         conn.execute("PRAGMA query_only=ON")
         rows = conn.execute(
             "SELECT timestamp, node_url, success, latency_ms, "
-            "       block_height, error_message "
+            "       block_height, error_message, source_location "
             "  FROM measurements "
             " WHERE timestamp >= ? AND timestamp < ? "
             " ORDER BY node_url, timestamp",

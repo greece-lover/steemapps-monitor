@@ -379,3 +379,266 @@ def test_json_metadata_contains_tags_and_custom_json_id():
     assert post.json_metadata["format"] == "markdown"
     assert post.json_metadata["steemapps_monitor"]["custom_json_id"] == "steemapps_api_stats_daily"
     assert post.json_metadata["steemapps_monitor"]["day"] == "2026-04-24"
+
+
+# =============================================================================
+#  Etappe 12a — extended sections
+# =============================================================================
+
+def _render_with(**kw):
+    """Variant of _render that lets the caller pass any of the new
+    optional aggregation arguments."""
+    per_node, gs = _sample_stats()
+    obs = kw.pop("observations_list", None) or observations.gather_observations(per_node, gs)
+    return template.render(
+        day="2026-04-24",
+        window_start="2026-04-24T00:00:00Z",
+        window_end="2026-04-25T00:00:00Z",
+        per_node=per_node,
+        global_stats=gs,
+        week=kw.pop("week", None),
+        observations=obs,
+        source_location="test",
+        app_name="steemapps-monitor/test",
+        tags=["steem", "api", "monitoring"],
+        repo_url="https://github.com/greece-lover/steemapps-monitor",
+        dashboard_url="https://api.steemapps.com",
+        witness_url="https://steemitwallet.com/~witnesses",
+        methodology_url=(
+            "https://github.com/greece-lover/steemapps-monitor/blob/main/"
+            "docs/MEASUREMENT-METHODOLOGY.md"
+        ),
+        **kw,
+    )
+
+
+def test_node_table_now_has_p50_and_p99_columns():
+    body = _render().body
+    # Header includes p50 and p99 between Avg and Errors.
+    assert "| Avg | p50 | p95 | p99 | Errors |" in body
+
+
+def test_latency_distribution_section_renders_with_data():
+    d = aggregation.LatencyDistribution(
+        sample_size=1000, pct_under_200ms=30.0,
+        pct_under_500ms=75.0, pct_under_1000ms=95.0, pct_above_1000ms=5.0,
+    )
+    body = _render_with(latency_distribution=d).body
+    assert "## Latency distribution" in body
+    assert "1,000 successful measurements" in body
+    assert "30.0 %" in body
+    assert "under 200 ms" in body
+
+
+def test_latency_distribution_section_omitted_when_no_data():
+    body = _render_with(
+        latency_distribution=aggregation.LatencyDistribution(0, 0.0, 0.0, 0.0, 0.0),
+    ).body
+    assert "## Latency distribution" not in body
+
+
+def test_hour_pattern_section_renders_best_and_worst_slot():
+    p = aggregation.HourPattern(
+        buckets=[
+            aggregation.HourBucket(h, 250 if h == 3 else (480 if h == 18 else None),
+                                   60 if h in (3, 18) else 0)
+            for h in range(24)
+        ],
+        best=aggregation.HourBucket(3, 250, 60),
+        worst=aggregation.HourBucket(18, 480, 60),
+    )
+    body = _render_with(hour_pattern=p).body
+    assert "## Time-of-day pattern" in body
+    assert "03:00–04:00 UTC" in body
+    assert "18:00–19:00 UTC" in body
+    assert "250 ms" in body
+    assert "480 ms" in body
+
+
+def test_hour_pattern_section_omitted_when_best_equals_worst():
+    """All measurements landed in the same hour — nothing to compare."""
+    only_one = aggregation.HourBucket(10, 200, 60)
+    p = aggregation.HourPattern(
+        buckets=[aggregation.HourBucket(h, None, 0) if h != 10 else only_one for h in range(24)],
+        best=only_one, worst=only_one,
+    )
+    body = _render_with(hour_pattern=p).body
+    assert "## Time-of-day pattern" not in body
+
+
+def test_error_pattern_section_renders_top_three():
+    eb = aggregation.ErrorBreakdown(
+        total_errors=100,
+        top=[
+            aggregation.ErrorTypeShare("connect_error", 62, 62.0),
+            aggregation.ErrorTypeShare("http_5xx", 28, 28.0),
+            aggregation.ErrorTypeShare("timeout", 10, 10.0),
+        ],
+    )
+    body = _render_with(error_breakdown=eb).body
+    assert "## Error pattern" in body
+    assert "`connect_error`" in body
+    assert "62.0 %" in body
+    assert "100 total errors" in body or "100 total" in body
+
+
+def test_error_pattern_section_omitted_when_clean_day():
+    eb = aggregation.ErrorBreakdown(total_errors=0, top=[])
+    body = _render_with(error_breakdown=eb).body
+    assert "## Error pattern" not in body
+
+
+def test_performance_gap_section_renders_factor_and_trend():
+    g = aggregation.PerformanceGap(
+        today_fastest_ms=120, today_slowest_ms=480,
+        today_factor=4.0, prev_factor=2.0, trend="widening",
+    )
+    body = _render_with(performance_gap=g).body
+    assert "## Best vs worst performance gap" in body
+    assert "4.00× faster" in body
+    assert "120 ms vs 480 ms" in body
+    assert "**widening**" in body
+    assert "2.00×" in body
+
+
+def test_performance_gap_section_renders_no_history_note():
+    g = aggregation.PerformanceGap(
+        today_fastest_ms=120, today_slowest_ms=480,
+        today_factor=4.0, prev_factor=None, trend="no_history",
+    )
+    body = _render_with(performance_gap=g).body
+    assert "## Best vs worst performance gap" in body
+    assert "Previous-week reference is not yet available" in body
+
+
+def test_cross_region_section_omitted_when_single_region():
+    cr = aggregation.CrossRegionResult(entries=[])
+    body = _render_with(cross_region=cr).body
+    assert "## Cross-region latency variance" not in body
+
+
+def test_cross_region_section_renders_table_when_multi_region():
+    cr = aggregation.CrossRegionResult(entries=[
+        aggregation.CrossRegionEntry(
+            node_url="https://a.example",
+            by_region={"eu-central": 200, "asia": 450},
+            variance_factor=2.25,
+        ),
+    ])
+    body = _render_with(cross_region=cr).body
+    assert "## Cross-region latency variance" in body
+    assert "`a.example`" in body
+    assert "eu-central 200 ms" in body
+    assert "asia 450 ms" in body
+    assert "2.25×" in body
+
+
+def test_reliability_ranking_section_uses_dynamic_day_count():
+    r = aggregation.ReliabilityRanking(
+        days_actual=14,
+        top=[aggregation.ReliabilityEntry("https://a.example", 99.95, 20000)],
+        bottom=[aggregation.ReliabilityEntry("https://z.example", 95.00, 20000)],
+        longest_streak_node="https://a.example",
+        longest_streak_days=14,
+    )
+    body = _render_with(reliability=r).body
+    # Headline reflects actual span — not a fixed "30-day".
+    assert "## 14-day reliability ranking" in body
+    assert "Most reliable" in body
+    assert "Least reliable" in body
+    assert "Longest unbroken uptime streak" in body
+    assert "14 days" in body
+
+
+def test_reliability_ranking_section_omitted_below_seven_days():
+    r = aggregation.ReliabilityRanking(
+        days_actual=3, top=[], bottom=[],
+        longest_streak_node=None, longest_streak_days=0,
+    )
+    body = _render_with(reliability=r).body
+    assert "reliability ranking" not in body.lower()
+
+
+def test_detail_image_section_renders_when_url_supplied():
+    body = _render_with(detail_image_url="https://api.steemapps.com/reports/2026-04-24-detail.png").body
+    assert "## Visual detail" in body
+    assert "2026-04-24-detail.png" in body
+
+
+def test_detail_image_section_omitted_when_url_missing():
+    body = _render_with(detail_image_url=None).body
+    assert "## Visual detail" not in body
+
+
+def test_json_metadata_contains_both_images_when_supplied():
+    post = _render_with(
+        cover_image_url="https://example.test/cover.png",
+        detail_image_url="https://example.test/detail.png",
+    )
+    assert post.json_metadata["image"] == [
+        "https://example.test/cover.png",
+        "https://example.test/detail.png",
+    ]
+
+
+# =============================================================================
+#  UTF-8 encoding pin — guards against accidental cp1252-ifying of the body
+# =============================================================================
+
+def test_body_contains_canonical_utf8_glyphs():
+    """The template uses em-dash, multiplication-sign, middle-dot and
+    plus-minus glyphs in several fixed places. Pin their codepoints so a
+    future copy edit doesn't accidentally substitute ASCII fallbacks
+    that look fine on a US-keyboard but break the visual rhythm Steemit
+    readers expect."""
+    cmp = aggregation.WeekComparison(
+        current_uptime_pct=99.5,
+        previous_uptime_pct=99.5,
+        delta_pp=0.0,
+        per_node_delta_pp={"https://a.example": 0.0},
+    )
+    body = _render(week=cmp).body
+    # ±0.00 pp lives in the week-over-week section.
+    assert "±" in body  # ± (PLUS-MINUS SIGN)
+    # Em-dash appears in many places — perspective notice, error-class column
+    # for clean nodes, etc.
+    assert "—" in body  # — (EM DASH)
+
+
+def test_body_round_trips_through_utf8_without_loss():
+    """Encoding the rendered body to UTF-8 bytes and decoding back must
+    return an identical string. This catches surrogate-pair issues and
+    any accidental encoding=ascii leak that would lose non-ASCII chars."""
+    body = _render().body
+    round_tripped = body.encode("utf-8").decode("utf-8")
+    assert body == round_tripped
+
+
+def test_body_has_no_mojibake_byte_sequences():
+    """If the body had been mis-decoded as cp1252 somewhere along the
+    pipeline, common mojibake markers (â€", Ã—, Â·) would show up.
+    Their absence here pins that the pipeline is UTF-8-clean end-to-end."""
+    body = _render().body
+    for marker in ["â€”", "Ã—", "Â·"]:
+        assert marker not in body, (
+            f"mojibake marker {marker!r} present in body — encoding pipeline broken"
+        )
+
+
+def test_error_class_separator_uses_real_multiplication_sign():
+    """Detail table renders error counts as `bucket ×N`. Pin the actual
+    × glyph (U+00D7) so a sloppy edit doesn't downgrade it to plain x."""
+    body = _render().body
+    if "Error classes" in body:
+        # The synthetic data in _sample_stats has a 'timeout' error.
+        # Its row in the table reads `timeout ×3`.
+        assert "×" in body  # × (MULTIPLICATION SIGN)
+
+
+def test_node_table_row_has_em_dash_for_clean_node():
+    """A node with no errors shows '—' in the error-class column. Pin
+    that glyph rather than letting it drift to '-' (HYPHEN-MINUS) or
+    '–' (EN DASH)."""
+    body = _render().body
+    # Clean node `a.example` (uptime 100%) has the em-dash in its row.
+    assert "| 0 | — |" in body

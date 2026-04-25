@@ -185,5 +185,5 @@ def test_custom_json_payload_shape_is_stable():
     node = payload["nodes"][0]
     assert node["url"] == "https://a.example"
     assert node["region"] == "eu"
-    assert set(node["latency_ms"]) == {"avg", "min", "max", "p95"}
+    assert set(node["latency_ms"]) == {"avg", "min", "max", "p50", "p95", "p99"}
     assert node["error_classes"] == {"timeout": 1}
