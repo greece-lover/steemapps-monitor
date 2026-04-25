@@ -53,7 +53,7 @@ outbound JSON-RPC calls to the public nodes.
    paths.
 
 3. **Verify.**
-   After ~10 minutes you should see flush log lines from the script and a
+   After 5–10 minutes you should see flush log lines from the script and a
    non-zero `24h` count for your Steem handle on
    <https://api.steemapps.com/sources.html>.
 
@@ -116,6 +116,27 @@ A: It does not. Pull the repo and rebuild the container or restart the
 A: Yes. `monitor.py` is a single 200-line Python file you can read in
    under five minutes. The wire format is documented at
    [docs/API.md](API.md) under the `POST /api/v1/ingest` section.
+
+**Q: Build fails with "No matching distribution found"?**
+A: On Ubuntu with `systemd-resolved` (default since 18.04),
+   `/etc/resolv.conf` points to `127.0.0.53`, which is not reachable
+   from inside the Docker build sandbox. Create a
+   `docker-compose.override.yml` next to `docker-compose.yml`:
+
+   ```yaml
+   services:
+     participant:
+       build:
+         context: .
+         network: host
+       dns:
+         - 1.1.1.1
+         - 8.8.8.8
+   ```
+
+   Alternatively system-wide: `/etc/docker/daemon.json` with
+   `{"dns": ["1.1.1.1", "8.8.8.8"]}`, then
+   `sudo systemctl restart docker`.
 
 ## Contact
 
