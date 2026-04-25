@@ -126,10 +126,10 @@ Schema migrations run automatically on service start (idempotent). Any destructi
 
 ## Public vs. development host
 
-| Item | Development (local VM) | Production (future IONOS) |
+| Item | Development (local VM) | Production |
 |---|---|---|
-| Host | REDACTED-IP | REDACTED-IP |
-| User | holger | steemapps-monitor |
+| Host | `<dev-vm-ip>` | `<production-host>` |
+| User | `<dev-user>` | `steemapps-monitor` |
 | Reverse proxy | none | nginx on :80/:443 |
 | TLS | none | Let's Encrypt |
 | DNS | none | api.steemapps.com |

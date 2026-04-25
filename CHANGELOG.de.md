@@ -137,20 +137,20 @@ Liegt unter `progress/2026-04-25-phase6-etappe8.md`, Abschnitt "Aufruf-Post (Ent
 - Dokumentations-Basis unter `docs/`: `ARCHITECTURE`/`ARCHITEKTUR`, `CONTRIBUTING`, `SECURITY`, `USER-GUIDE` (alle zweisprachig), `DEPLOYMENT`, `KI_TRANSPARENZ`, `MEASUREMENT-METHODOLOGY`/`MESSMETHODIK`, `API`
 - `LICENSE` (MIT)
 - Python-orientierte `.gitignore`
-- SSH-Host-Alias `steemfork` in der SSH-Config des Autors für die Entwicklungs-VM
-- Server-Arbeitsverzeichnis `/opt/steemapps-monitor/` auf der Entwicklungs-VM (Ubuntu 24.04, REDACTED-IP)
+- SSH-Host-Alias für die Entwicklungs-VM in der SSH-Config des Autors
+- Server-Arbeitsverzeichnis `/opt/steemapps-monitor/` auf der lokalen Entwicklungs-VM (Ubuntu 24.04)
 - `progress/2026-04-24-phase1-bestandsaufnahme.md` — Phase-1-Server-Audit
 - `progress/2026-04-24-phase2.md` — Phase-2-Zeitstempel-Log
 - Privates GitHub-Repository `greece-lover/steemapps-monitor`
 
 ### Bekannte Abweichungen vom Konzept
 
-- **Hosting-Ziel:** Das Konzept nennt den IONOS-Server (REDACTED-IP) als Produktionsserver; die initiale Entwicklung läuft auf der lokalen Ubuntu-VM des Autors. Der IONOS-Deploy wird in eine spätere Phase verschoben und wird die dort laufende Alreco-Installation nicht berühren.
+- **Hosting-Ziel:** Der Produktionsserver wird in eine spätere Phase verschoben; die initiale Entwicklung läuft auf der lokalen Ubuntu-VM des Autors.
 
 ## [Phase 1] — 2026-04-24
 
 ### Hinzugefügt
 
-- Server-Audit der Entwicklungs-VM `steemfork` (REDACTED-IP, Ubuntu 24.04)
+- Server-Audit der lokalen Entwicklungs-VM (Ubuntu 24.04)
 - Bestätigung, dass vorhandene Workloads (`steem-fork`, `sqv-indexer`, `sqv-frontend`) nicht beeinträchtigt werden
 - Netzwerk-Verifikation: alle vier initialen Steem-API-Nodes erreichbar mit Sub-Sekunden-Latenz

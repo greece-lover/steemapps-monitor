@@ -14,7 +14,7 @@ The monitor API binds to `127.0.0.1:8110` on the VM and UFW does not
 expose it. Forward the port through SSH:
 
 ```bash
-ssh -L 8110:127.0.0.1:8110 steemfork
+ssh -L 8110:127.0.0.1:8110 your-monitor-host
 ```
 
 Then open `frontend/index.html` in any browser. The fetch calls default

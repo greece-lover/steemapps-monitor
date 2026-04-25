@@ -1,6 +1,6 @@
 # Deploy notes — Phase 3 + Phase 5
 
-Target: single VM (`REDACTED-IP`), workdir `/opt/steemapps-monitor/`.
+Target: a single VM, see `deploy/steemapps-monitor.service` for paths.
 The monitor runs as `holger`, the reporter as a dedicated unprivileged
 `steemapps-reporter` user. No reverse proxy yet; the API binds to
 `127.0.0.1:8110` and is not exposed outside the VM.

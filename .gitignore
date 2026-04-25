@@ -43,3 +43,8 @@ Thumbs.db
 
 # Phase-1 forensic artefacts (kept locally for traceability, not committed)
 _probe_*
+
+# Internal working logs and strategy notes (not for public repo)
+progress/
+STEEMAPPS_PROJEKT_KONZEPT.md
+*PROJEKT_KONZEPT*.md
