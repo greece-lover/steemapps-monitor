@@ -26,11 +26,11 @@ Dieses Projekt schließt diese Lücke mit einem Python-Dienst, der jeden bekannt
 
 ## Status
 
-Phase 3 — Monitor-Kern implementiert (Poll-Schleife, SQLite, Scoring, FastAPI, systemd-Unit). 18/18 Tests lokal grün; VM-Deploy steht noch aus. Siehe [ROADMAP.de.md](ROADMAP.de.md).
+Live im Produktivbetrieb. Der Monitor läuft kontinuierlich von einem europäischen Standort, mit öffentlichem Dashboard auf https://api.steemapps.com und täglicher Zusammenfassung auf Steemit durch @steem-api-health. Siehe [ROADMAP.de.md](ROADMAP.de.md) für die nächsten Schritte.
 
-Das Repository bleibt **privat**, bis der erste automatisierte Tages-Report erfolgreich läuft. Zu diesem Zeitpunkt wird es auf öffentlich umgeschaltet, begleitet von einem Ankündigungs-Post auf Steemit.
+Mitmach-Möglichkeit für verteilte Messungen: siehe [docs/TEILNEHMEN.md](docs/TEILNEHMEN.md).
 
-## Schnellstart (Entwickler-Vorschau)
+## Schnellstart
 
 ```bash
 git clone git@github.com:greece-lover/steemapps-monitor.git

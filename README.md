@@ -26,11 +26,11 @@ This project fills that gap with a Python service that measures every known Stee
 
 ## Status
 
-Phase 3 — monitor core implemented (poll loop, SQLite, scoring, FastAPI, systemd unit). 18/18 tests green locally; VM deployment pending. See [ROADMAP.md](ROADMAP.md).
+Live in production. The monitor runs continuously on a single European location, with a public dashboard at https://api.steemapps.com and a daily summary post on Steemit by @steem-api-health. See [ROADMAP.md](ROADMAP.md) for what's next.
 
-The repository is **private** until the first automated daily report runs successfully. At that point it will be switched to public, with an announcement post on Steemit.
+Open contributions for distributed measurements: see [docs/PARTICIPATE.md](docs/PARTICIPATE.md).
 
-## Quick start (developer preview)
+## Quick start
 
 ```bash
 git clone git@github.com:greece-lover/steemapps-monitor.git
