@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Data · Steem API Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap">
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="site-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <div class="brand-title">Data</div>
+        <div class="brand-tagline">Download raw measurements, pre-bucketed aggregates, and outage logs.</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="toolbar">
+        <button type="button" class="toolbar-btn" data-theme-toggle>☀ Light</button>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">Overview</a>
+        <a href="stats.html">Stats</a>
+        <a href="regions.html">Regions</a>
+        <a href="outages.html">Outages</a>
+        <a href="sources.html">Sources</a>
+        <a href="data.html" class="active">Data</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- Overview -->
+  <section class="join-step" aria-labelledby="overview-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="overview-title">What's available</h2>
+    </div>
+    <p>Three datasets, three formats (CSV, JSON, JSONL). Filter by time
+       range, by node, and by measurement source. The downloads stream
+       straight from the SQLite store — even the 90-day raw export holds
+       only one chunk in server memory at a time.</p>
+    <p><strong>License:</strong> data is freely usable under the same MIT
+       terms as the source code. Attribution to <code>@steem-api-health</code>
+       is appreciated. If you build something on it, leave a comment under
+       any daily report — we'll link back.</p>
+  </section>
+
+  <!-- 1) Raw measurements -->
+  <section class="join-step" aria-labelledby="m-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="m-title">Raw measurements</h2>
+    </div>
+    <p>One row per polled tick: timestamp, node URL, success flag,
+       latency, head-block height, error category, source location.</p>
+
+    <form class="join-form" id="m-form" autocomplete="off">
+      <div class="export-grid">
+        <div class="join-field">
+          <label for="m-range">Time range</label>
+          <select id="m-range" name="range">
+            <option value="24h">last 24 hours</option>
+            <option value="7d" selected>last 7 days</option>
+            <option value="30d">last 30 days</option>
+            <option value="90d">last 90 days</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="m-node">Node (optional)</label>
+          <select id="m-node" name="node">
+            <option value="">all nodes</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="m-source">Source (optional)</label>
+          <select id="m-source" name="source">
+            <option value="">all sources</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="m-format">Format</label>
+          <select id="m-format" name="format">
+            <option value="csv" selected>CSV</option>
+            <option value="json">JSON</option>
+            <option value="jsonl">JSON Lines</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="join-actions">
+        <a href="#" class="btn-primary" id="m-download" download>Download</a>
+        <button type="button" class="btn-secondary" id="m-snippets-toggle">Show code snippets</button>
+      </div>
+    </form>
+
+    <pre class="join-pre export-snippets" id="m-snippets" hidden></pre>
+  </section>
+
+  <!-- 2) Aggregates -->
+  <section class="join-step" aria-labelledby="a-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="a-title">Aggregates (hourly / daily)</h2>
+    </div>
+    <p>Pre-bucketed counts and average latencies — one row per
+       (bucket, node). Use these when you don't need per-tick detail
+       and want a much smaller download.</p>
+
+    <form class="join-form" id="a-form" autocomplete="off">
+      <div class="export-grid">
+        <div class="join-field">
+          <label for="a-range">Time range</label>
+          <select id="a-range" name="range">
+            <option value="24h">last 24 hours</option>
+            <option value="7d" selected>last 7 days</option>
+            <option value="30d">last 30 days</option>
+            <option value="90d">last 90 days</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="a-granularity">Granularity</label>
+          <select id="a-granularity" name="granularity">
+            <option value="hourly" selected>hourly</option>
+            <option value="daily">daily</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="a-node">Node (optional)</label>
+          <select id="a-node" name="node">
+            <option value="">all nodes</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="a-source">Source (optional)</label>
+          <select id="a-source" name="source">
+            <option value="">all sources</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="a-format">Format</label>
+          <select id="a-format" name="format">
+            <option value="csv" selected>CSV</option>
+            <option value="json">JSON</option>
+            <option value="jsonl">JSON Lines</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="join-actions">
+        <a href="#" class="btn-primary" id="a-download" download>Download</a>
+        <button type="button" class="btn-secondary" id="a-snippets-toggle">Show code snippets</button>
+      </div>
+    </form>
+
+    <pre class="join-pre export-snippets" id="a-snippets" hidden></pre>
+  </section>
+
+  <!-- 3) Outages -->
+  <section class="join-step" aria-labelledby="o-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="o-title">Outage log</h2>
+    </div>
+    <p>Each row: a contiguous run of failed ticks. Severity <em>real</em>
+       means at least 2 minutes; <em>short</em> is a transient hiccup.</p>
+
+    <form class="join-form" id="o-form" autocomplete="off">
+      <div class="export-grid">
+        <div class="join-field">
+          <label for="o-range">Time range</label>
+          <select id="o-range" name="range">
+            <option value="24h">last 24 hours</option>
+            <option value="7d">last 7 days</option>
+            <option value="30d" selected>last 30 days</option>
+            <option value="90d">last 90 days</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="o-severity">Severity</label>
+          <select id="o-severity" name="severity">
+            <option value="">all</option>
+            <option value="real">real (≥ 2 min)</option>
+            <option value="short">short</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="o-node">Node (optional)</label>
+          <select id="o-node" name="node">
+            <option value="">all nodes</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="o-source">Source (optional)</label>
+          <select id="o-source" name="source">
+            <option value="">all sources</option>
+          </select>
+        </div>
+        <div class="join-field">
+          <label for="o-format">Format</label>
+          <select id="o-format" name="format">
+            <option value="csv" selected>CSV</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="join-actions">
+        <a href="#" class="btn-primary" id="o-download" download>Download</a>
+        <button type="button" class="btn-secondary" id="o-snippets-toggle">Show code snippets</button>
+      </div>
+    </form>
+
+    <pre class="join-pre export-snippets" id="o-snippets" hidden></pre>
+  </section>
+
+  <!-- API reference -->
+  <section class="join-step" aria-labelledby="api-title">
+    <div class="join-step-head">
+      <h2 class="join-step-title" id="api-title">Programmatic access</h2>
+    </div>
+    <p>Every download here is a plain HTTP GET — automate it with curl,
+       a daily cron, or a notebook. The complete endpoint reference lives
+       at <a href="https://github.com/greece-lover/steemapps-monitor/blob/main/docs/API.md" target="_blank" rel="noopener">docs/API.md</a>.</p>
+
+    <ul class="resources-list">
+      <li><code>GET /api/v1/export/measurements</code> — raw rows</li>
+      <li><code>GET /api/v1/export/aggregates</code> — bucketed totals</li>
+      <li><code>GET /api/v1/export/outages.csv</code> / <code>.json</code> — outage log</li>
+      <li><code>GET /api/v1/export/sources</code> — list of source labels for the dropdown</li>
+    </ul>
+  </section>
+
+</main>
+
+<script src="js/common.js" defer></script>
+<script src="js/data.js" defer></script>
+</body>
+</html>

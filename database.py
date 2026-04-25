@@ -522,3 +522,155 @@ def get_per_node_aggregates(
     can range-seek the composite `(node_url, timestamp)` index. See
     docs/PERFORMANCE.md for the numbers."""
     return get_per_node_aggregates_between(lookback_minutes, 0, db_path=db_path)
+
+
+# =============================================================================
+#  Phase 6 Etappe 12b — bulk export helpers
+# =============================================================================
+#
+# These power the /api/v1/export/* endpoints. Two design choices that
+# matter for big windows:
+#
+#   1. Streaming over fetchmany() instead of fetchall() — at 90 days /
+#      10 nodes / 60 s polling we'd be loading ~1.3 M rows into a list
+#      otherwise. The generator yields one row dict at a time so the
+#      caller (a FastAPI StreamingResponse) can serialise straight to
+#      the wire without ever holding the full result set.
+#
+#   2. Optional node and source filters are pushed into the WHERE clause
+#      so SQLite uses the same `(node_url, timestamp)` composite index
+#      it uses for the dashboard's range queries. A post-fetch Python
+#      filter would scan the full window and waste IO.
+
+
+def stream_measurements(
+    *,
+    start_iso: str,
+    end_iso: str,
+    node_url: Optional[str] = None,
+    source_location: Optional[str] = None,
+    db_path: Path | str = DB_PATH,
+    chunk_size: int = 1000,
+) -> Iterator[dict]:
+    """Yield measurement rows in `[start_iso, end_iso)` one at a time.
+
+    Filters compose with AND. The result is ordered by (node_url,
+    timestamp) so a CSV reader can group rows per node without a
+    second pass.
+    """
+    sql_parts = [
+        "SELECT timestamp, node_url, success, latency_ms, "
+        "       block_height, error_message, source_location "
+        "  FROM measurements "
+        " WHERE timestamp >= ? AND timestamp < ?"
+    ]
+    params: list = [start_iso, end_iso]
+    if node_url:
+        sql_parts.append(" AND node_url = ?")
+        params.append(node_url)
+    if source_location:
+        sql_parts.append(" AND source_location = ?")
+        params.append(source_location)
+    sql_parts.append(" ORDER BY node_url, timestamp")
+    sql = "".join(sql_parts)
+
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only=ON")
+        cur = conn.execute(sql, params)
+        while True:
+            chunk = cur.fetchmany(chunk_size)
+            if not chunk:
+                break
+            for row in chunk:
+                yield dict(row)
+    finally:
+        conn.close()
+
+
+def stream_aggregates(
+    *,
+    start_iso: str,
+    end_iso: str,
+    granularity: str,                       # "hourly" | "daily"
+    node_url: Optional[str] = None,
+    source_location: Optional[str] = None,
+    db_path: Path | str = DB_PATH,
+) -> Iterator[dict]:
+    """Yield pre-computed aggregates per (bucket, node) row.
+
+    For hourly the bucket key is `YYYY-MM-DDTHH:00:00Z`, for daily it's
+    `YYYY-MM-DD`. Each row carries: bucket, node_url, total, ok,
+    uptime_pct, errors, avg_latency_ms, min_latency_ms, max_latency_ms.
+    Percentiles (p50/p95/p99) are intentionally omitted from this path —
+    they would require a sort per bucket, which kills the streaming
+    advantage; downloaders that need percentiles can compute them from
+    the raw measurements export.
+    """
+    if granularity not in {"hourly", "daily"}:
+        raise ValueError(f"granularity must be 'hourly' or 'daily', got {granularity!r}")
+    if granularity == "hourly":
+        bucket_expr = "substr(timestamp, 1, 13) || ':00:00Z'"     # YYYY-MM-DDTHH:00:00Z
+    else:
+        bucket_expr = "substr(timestamp, 1, 10)"                  # YYYY-MM-DD
+
+    sql_parts = [
+        f"SELECT {bucket_expr} AS bucket, node_url, "
+        " COUNT(*) AS total, "
+        " SUM(success) AS ok, "
+        " COUNT(*) - SUM(success) AS errors, "
+        " AVG(CASE WHEN success=1 THEN latency_ms END) AS avg_latency_ms, "
+        " MIN(CASE WHEN success=1 THEN latency_ms END) AS min_latency_ms, "
+        " MAX(CASE WHEN success=1 THEN latency_ms END) AS max_latency_ms "
+        " FROM measurements "
+        " WHERE timestamp >= ? AND timestamp < ?"
+    ]
+    params: list = [start_iso, end_iso]
+    if node_url:
+        sql_parts.append(" AND node_url = ?")
+        params.append(node_url)
+    if source_location:
+        sql_parts.append(" AND source_location = ?")
+        params.append(source_location)
+    sql_parts.append(" GROUP BY bucket, node_url ORDER BY bucket, node_url")
+    sql = "".join(sql_parts)
+
+    conn = sqlite3.connect(str(db_path), timeout=10.0)
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA query_only=ON")
+        cur = conn.execute(sql, params)
+        while True:
+            chunk = cur.fetchmany(1000)
+            if not chunk:
+                break
+            for row in chunk:
+                d = dict(row)
+                total = int(d["total"] or 0)
+                ok = int(d["ok"] or 0)
+                d["ok"] = ok
+                d["uptime_pct"] = round(100.0 * ok / total, 2) if total else 0.0
+                # SQLite returns AVG as float — round to 1 decimal so
+                # the CSV stays readable.
+                if d["avg_latency_ms"] is not None:
+                    d["avg_latency_ms"] = round(d["avg_latency_ms"], 1)
+                yield d
+    finally:
+        conn.close()
+
+
+def list_distinct_source_locations(db_path: Path | str = DB_PATH) -> list[str]:
+    """All `source_location` values that have ever produced measurements.
+
+    Used by the data.html dropdown so the user picks from real values
+    instead of guessing labels. Cheap query — `source_location` doesn't
+    have an index but the cardinality is tiny (≤ low double digits).
+    """
+    with connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT source_location FROM measurements "
+            " WHERE source_location IS NOT NULL "
+            " ORDER BY source_location"
+        ).fetchall()
+    return [r["source_location"] for r in rows]

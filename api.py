@@ -23,7 +23,7 @@ from urllib.parse import unquote
 
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 import config
@@ -607,15 +607,22 @@ def build_app() -> FastAPI:
         node: Optional[str] = None,
         severity: Optional[str] = Query(None, pattern="^(short|real)$"),
         min_duration_s: int = Query(0, ge=0, le=86400),
+        source: Optional[str] = None,
     ) -> Response:
         """CSV download of the filtered outage log. Reuses the exact
         filter pipeline of /api/v1/outages so what you download is what
-        you see on the page."""
+        you see on the page. The `source` filter narrows to outages
+        observed by one specific measurement source — the underlying
+        outage detector still runs across the full fleet view first,
+        and the source filter is applied to the resulting rows."""
         outages = _filtered_global_outages(range, node, severity, min_duration_s)
+        if source:
+            outages = [o for o in outages if o.get("source_location") == source]
         body = _outages_csv(outages)
         filename = f"outages-{range}"
         if node: filename += f"-{node.replace('https://','').replace('/','_')}"
         if severity: filename += f"-{severity}"
+        if source: filename += f"-src-{source.replace(' ', '_')}"
         filename += ".csv"
         return Response(
             content=body,
@@ -629,17 +636,21 @@ def build_app() -> FastAPI:
         node: Optional[str] = None,
         severity: Optional[str] = Query(None, pattern="^(short|real)$"),
         min_duration_s: int = Query(0, ge=0, le=86400),
+        source: Optional[str] = None,
     ) -> Response:
         """JSON download of the filtered outage log. Same filter
         pipeline as the CSV export; only the Content-Disposition and
         envelope differ."""
         import json as _json
         outages = _filtered_global_outages(range, node, severity, min_duration_s)
+        if source:
+            outages = [o for o in outages if o.get("source_location") == source]
         payload = {
             "range": range,
             "node_filter": node,
             "severity_filter": severity,
             "min_duration_s": min_duration_s,
+            "source_filter": source,
             "severity_threshold_s": database.OUTAGE_SEVERITY_THRESHOLD_S,
             "generated_at": _utcnow_iso(),
             "total": len(outages),
@@ -648,12 +659,235 @@ def build_app() -> FastAPI:
         filename = f"outages-{range}"
         if node: filename += f"-{node.replace('https://','').replace('/','_')}"
         if severity: filename += f"-{severity}"
+        if source: filename += f"-src-{source.replace(' ', '_')}"
         filename += ".json"
         return Response(
             content=_json.dumps(payload, indent=2),
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    # ------------------------------------------------------------------ #
+    #  Phase 6 Etappe 12b — bulk export endpoints                          #
+    # ------------------------------------------------------------------ #
+    # measurements: raw rows (csv/json/jsonl). aggregates: per-bucket
+    # (csv/json/jsonl, hourly or daily). Both stream over a server-side
+    # cursor so the API process holds at most one chunk in memory even
+    # at the 90-day window cap.
+
+    _EXPORT_RANGE_TO_MINUTES = {
+        "24h": 24 * 60,
+        "7d":  7 * 24 * 60,
+        "30d": 30 * 24 * 60,
+        "90d": 90 * 24 * 60,
+    }
+
+    def _export_window(range_str: str) -> tuple[str, str]:
+        """Return (start_iso, end_iso) for the requested range. The
+        upper bound is now-rounded-to-the-second so two consecutive
+        downloads in the same minute share a stable boundary."""
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+        now = _dt.now(_tz.utc).replace(microsecond=0)
+        end = now + _td(seconds=1)                  # exclusive — include current second
+        minutes = _EXPORT_RANGE_TO_MINUTES[range_str]
+        start = now - _td(minutes=minutes)
+        fmt = "%Y-%m-%dT%H:%M:%SZ"
+        return start.strftime(fmt), end.strftime(fmt)
+
+    def _csv_field(v) -> str:
+        """Minimal RFC-4180 quoting — same convention as _outages_csv."""
+        if v is None:
+            return ""
+        s = str(v)
+        if '"' in s or ',' in s or '\n' in s:
+            return '"' + s.replace('"', '""') + '"'
+        return s
+
+    @app.get("/api/v1/export/measurements")
+    def export_measurements(
+        range: str = Query("24h", pattern="^(24h|7d|30d|90d)$"),
+        node: Optional[str] = None,
+        source: Optional[str] = None,
+        format: str = Query("csv", pattern="^(csv|json|jsonl)$"),
+    ) -> StreamingResponse:
+        """Streaming export of raw measurement rows.
+
+        - `csv`   header row + one CSV line per measurement
+        - `json`  pretty-printed JSON object with metadata + array
+        - `jsonl` one JSON object per line (newline-delimited JSON)
+
+        Filters: optional `node` (exact URL match) and `source`
+        (exact source_location match). Use `/api/v1/export/sources`
+        to enumerate available source labels.
+        """
+        if node:
+            _validate_node(node)
+        start_iso, end_iso = _export_window(range)
+
+        if format == "csv":
+            def _gen_csv():
+                yield "timestamp,node_url,success,latency_ms,block_height,error_message,source_location\n"
+                for r in database.stream_measurements(
+                    start_iso=start_iso, end_iso=end_iso,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    yield ",".join([
+                        _csv_field(r["timestamp"]),
+                        _csv_field(r["node_url"]),
+                        "1" if r["success"] else "0",
+                        _csv_field(r["latency_ms"]),
+                        _csv_field(r["block_height"]),
+                        _csv_field(r["error_message"]),
+                        _csv_field(r["source_location"]),
+                    ]) + "\n"
+            media_type = "text/csv; charset=utf-8"
+            ext = "csv"
+            body = _gen_csv()
+        elif format == "jsonl":
+            import json as _json
+            def _gen_jsonl():
+                for r in database.stream_measurements(
+                    start_iso=start_iso, end_iso=end_iso,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    r["success"] = bool(r["success"])
+                    yield _json.dumps(r) + "\n"
+            media_type = "application/x-ndjson"
+            ext = "jsonl"
+            body = _gen_jsonl()
+        else:                                      # format == "json"
+            import json as _json
+            envelope = {
+                "range": range, "node_filter": node,
+                "source_filter": source, "window": {"start": start_iso, "end": end_iso},
+                "generated_at": _utcnow_iso(),
+            }
+            envelope_open = _json.dumps(envelope)[:-1]   # drop the closing brace
+            def _gen_json():
+                yield envelope_open + ", \"measurements\": ["
+                first = True
+                for r in database.stream_measurements(
+                    start_iso=start_iso, end_iso=end_iso,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    r["success"] = bool(r["success"])
+                    yield ("" if first else ",") + _json.dumps(r)
+                    first = False
+                yield "]}"
+            media_type = "application/json"
+            ext = "json"
+            body = _gen_json()
+
+        filename = f"measurements-{range}"
+        if node: filename += f"-{node.replace('https://','').replace('/','_')}"
+        if source: filename += f"-src-{source.replace(' ', '_')}"
+        filename += f".{ext}"
+        return StreamingResponse(
+            body,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.get("/api/v1/export/aggregates")
+    def export_aggregates(
+        range: str = Query("24h", pattern="^(24h|7d|30d|90d)$"),
+        granularity: str = Query("hourly", pattern="^(hourly|daily)$"),
+        node: Optional[str] = None,
+        source: Optional[str] = None,
+        format: str = Query("csv", pattern="^(csv|json|jsonl)$"),
+    ) -> StreamingResponse:
+        """Streaming export of pre-bucketed aggregates.
+
+        Bucket key shape: `YYYY-MM-DDTHH:00:00Z` for hourly,
+        `YYYY-MM-DD` for daily. One row per (bucket, node), with
+        total / ok / errors / uptime_pct / avg/min/max latency.
+        """
+        if node:
+            _validate_node(node)
+        start_iso, end_iso = _export_window(range)
+
+        if format == "csv":
+            def _gen_csv():
+                yield "bucket,node_url,total,ok,errors,uptime_pct,avg_latency_ms,min_latency_ms,max_latency_ms\n"
+                for r in database.stream_aggregates(
+                    start_iso=start_iso, end_iso=end_iso,
+                    granularity=granularity,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    yield ",".join([
+                        _csv_field(r["bucket"]),
+                        _csv_field(r["node_url"]),
+                        _csv_field(r["total"]),
+                        _csv_field(r["ok"]),
+                        _csv_field(r["errors"]),
+                        _csv_field(r["uptime_pct"]),
+                        _csv_field(r["avg_latency_ms"]),
+                        _csv_field(r["min_latency_ms"]),
+                        _csv_field(r["max_latency_ms"]),
+                    ]) + "\n"
+            media_type = "text/csv; charset=utf-8"
+            ext = "csv"
+            body = _gen_csv()
+        elif format == "jsonl":
+            import json as _json
+            def _gen_jsonl():
+                for r in database.stream_aggregates(
+                    start_iso=start_iso, end_iso=end_iso,
+                    granularity=granularity,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    yield _json.dumps(r) + "\n"
+            media_type = "application/x-ndjson"
+            ext = "jsonl"
+            body = _gen_jsonl()
+        else:                                      # format == "json"
+            import json as _json
+            envelope = {
+                "range": range, "granularity": granularity,
+                "node_filter": node, "source_filter": source,
+                "window": {"start": start_iso, "end": end_iso},
+                "generated_at": _utcnow_iso(),
+            }
+            envelope_open = _json.dumps(envelope)[:-1]
+            def _gen_json():
+                yield envelope_open + ", \"aggregates\": ["
+                first = True
+                for r in database.stream_aggregates(
+                    start_iso=start_iso, end_iso=end_iso,
+                    granularity=granularity,
+                    node_url=node, source_location=source,
+                    db_path=database.DB_PATH,
+                ):
+                    yield ("" if first else ",") + _json.dumps(r)
+                    first = False
+                yield "]}"
+            media_type = "application/json"
+            ext = "json"
+            body = _gen_json()
+
+        filename = f"aggregates-{granularity}-{range}"
+        if node: filename += f"-{node.replace('https://','').replace('/','_')}"
+        if source: filename += f"-src-{source.replace(' ', '_')}"
+        filename += f".{ext}"
+        return StreamingResponse(
+            body,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @app.get("/api/v1/export/sources")
+    def export_sources_list() -> dict:
+        """List the source_location values that have ever produced data.
+        Powers the source-filter dropdown on data.html."""
+        return {
+            "generated_at": _utcnow_iso(),
+            "sources": database.list_distinct_source_locations(database.DB_PATH),
+        }
 
     @app.get("/api/v1/stats/top")
     def stats_top(

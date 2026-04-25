@@ -1113,6 +1113,24 @@ a.node-card:hover { border-color: var(--accent-dim); }
 .resources-list li:last-child { border-bottom: 0; }
 .resources-list a { color: var(--accent); }
 
+/* ---------- Data downloads page (data.html) ---------- */
+
+/* Filter row: 5 inputs side-by-side on desktop, stacks on tablet via
+   the existing .join-form mobile rules. */
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.export-snippets {
+  margin-top: 14px;
+  font-size: 12px;
+  white-space: pre;
+  max-height: 280px;
+  overflow: auto;
+}
+
 /* ---------- Mobile ---------- */
 
 /* ---------- Tablet (≤ 768 px) ---------- */
