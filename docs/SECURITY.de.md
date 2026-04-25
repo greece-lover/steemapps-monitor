@@ -48,7 +48,7 @@ Das Repository ist bis Phase 7 privat. Während der privaten Phase:
 Wenn das Repository öffentlich wird, bestätigt ein Pre-Switch-Audit:
 
 - Keine echten Keys in der Historie (inklusive Git-Historie — `git log -p | grep -iE 'key|secret|password|pass='`)
-- Keine kundenspezifischen Server-Hostnames über die bereits öffentliche IONOS-Adresse hinaus
+- Keine kundenspezifischen Server-Hostnames über die bereits öffentliche Server-Adresse hinaus
 - Keine Entwicklungs-Reste oder interne VM-Bezeichner, die nicht öffentlich sein sollten
 
 ## Dienst-Härtung

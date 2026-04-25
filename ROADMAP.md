@@ -26,7 +26,7 @@ Repository, documentation foundation, SSH alias, server working directory. No mo
 
 - Read-only JSON endpoints for status, history, and outages
 - Stable schema documented in `docs/API.md`
-- Reverse-proxy target `api.steemapps.com` (nginx on the IONOS server, later phase)
+- Reverse-proxy target `api.steemapps.com` (nginx on the production server, later phase)
 
 ## Phase 5 — Dashboard (target: 2026-04-28 to 2026-04-30)
 
