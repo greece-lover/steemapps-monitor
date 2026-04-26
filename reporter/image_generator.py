@@ -664,8 +664,8 @@ def _draw_cross_region_stripe(
         return
     draw = ImageDraw.Draw(img)
     cx0, cy0, cx1, cy1 = content_box
-    # Top up to 8 most-variant nodes. With 11 nodes total in nodes.json
-    # the cap drops the 3 lowest-variance ones; it keeps the stripe
+    # Top up to 8 most-variant nodes. With 10 nodes total in nodes.json
+    # this is effectively "all of them" today; the cap keeps the stripe
     # readable if a future config doubles the fleet.
     entries = cr.entries[:8]
     n_groups = len(entries)
