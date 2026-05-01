@@ -24,6 +24,11 @@
   --status-down: #ef6a6a;
   --status-unknown: #4b4b4b;
 
+  /* Category colours — orthogonal to status. `live` has no badge so no
+     swatch is needed; `testing` is amber, `community` is a friendly blue. */
+  --category-testing:   #f5a623;
+  --category-community: #4a90e2;
+
   --chart-grid:  #1e1e1e;
   --chart-tick:  #8c8c8c;
 
@@ -55,6 +60,9 @@
   --status-deg:  #bd8e1a;
   --status-down: #c9443f;
   --status-unknown: #b8b8b8;
+
+  --category-testing:   #b9751a;
+  --category-community: #2f6cb0;
 
   --chart-grid:  #ececec;
   --chart-tick:  #666666;
@@ -216,6 +224,104 @@ a:hover { text-decoration: underline; }
 .status-pill[data-status="ok"]       .dot { background: var(--status-ok); }
 .status-pill[data-status="degraded"] .dot { background: var(--status-deg); }
 .status-pill[data-status="down"]     .dot { background: var(--status-down); }
+
+/* Category pill — same baseline as status-pill, recoloured per category.
+   `live` is intentionally not styled because the renderer does not emit a
+   pill for it (no visual noise on the default case). */
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: help;
+}
+.category-pill .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-unknown);
+}
+.category-pill[data-category="testing"]   .dot { background: var(--category-testing); }
+.category-pill[data-category="community"] .dot { background: var(--category-community); }
+
+.pill-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Status + Category legend on the overview page. Foldable via <details>
+   so the controls bar stays visually quiet by default. */
+.overview-legend {
+  margin: 0 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+.overview-legend > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.overview-legend > summary::-webkit-details-marker { display: none; }
+.overview-legend > summary::before {
+  content: "▸ ";
+  color: var(--text-dim);
+}
+.overview-legend[open] > summary::before { content: "▾ "; }
+.overview-legend-body {
+  padding: 4px 12px 12px;
+  display: grid;
+  gap: 8px;
+}
+.legend-axis-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.legend-axis-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  font-size: 12px;
+  color: var(--text);
+}
+.legend-axis-row .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-axis-row .legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.legend-axis-row .legend-swatch.s-ok       { background: var(--status-ok); }
+.legend-axis-row .legend-swatch.s-deg      { background: var(--status-deg); }
+.legend-axis-row .legend-swatch.s-down     { background: var(--status-down); }
+.legend-axis-row .legend-swatch.s-unknown  { background: var(--status-unknown); }
+.legend-axis-row .legend-swatch.c-testing  { background: var(--category-testing); }
+.legend-axis-row .legend-swatch.c-community { background: var(--category-community); }
+.legend-axis-note {
+  font-size: 11px;
+  color: var(--text-dim);
+}
 
 .stat-row {
   display: grid;

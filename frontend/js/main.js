@@ -137,15 +137,33 @@
   function buildCard(node) {
     const urlEnc = encodeURIComponent(node.url);
 
+    const pills = [
+      el('div', { class: 'status-pill', dataset: { status: node.status } }, [
+        el('span', { class: 'dot' }),
+        node.status.toUpperCase(),
+      ]),
+    ];
+    // Render category pill only for non-default categories. `live` is the
+    // default for production nodes — showing a badge for every one of them
+    // would just be visual noise.
+    if (node.category && node.category !== 'live') {
+      const catPill = el('div', {
+        class: 'category-pill',
+        dataset: { category: node.category },
+        title: node.description || '',
+      }, [
+        el('span', { class: 'dot' }),
+        node.category.toUpperCase(),
+      ]);
+      pills.push(catPill);
+    }
+
     const head = el('div', { class: 'node-head' }, [
       el('div', {}, [
         el('div', { class: 'node-url' }, node.url.replace(/^https?:\/\//, '')),
         el('div', { class: 'node-region' }, node.region ? `region: ${node.region}` : ''),
       ]),
-      el('div', { class: 'status-pill', dataset: { status: node.status } }, [
-        el('span', { class: 'dot' }),
-        node.status.toUpperCase(),
-      ]),
+      el('div', { class: 'pill-row' }, pills),
     ]);
 
     const scoreVal = node.score == null ? '—' : String(node.score);

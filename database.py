@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS nodes (
     url         TEXT PRIMARY KEY,
     region      TEXT,
     added_at    TEXT NOT NULL,
-    active      INTEGER NOT NULL DEFAULT 1
+    active      INTEGER NOT NULL DEFAULT 1,
+    category    TEXT NOT NULL DEFAULT 'live',
+    description TEXT
 );
 
 CREATE TABLE IF NOT EXISTS measurements (
@@ -122,11 +124,26 @@ def connect(db_path: Path | str = DB_PATH) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _migrate_nodes_table(conn: sqlite3.Connection) -> None:
+    """Bring an older `nodes` table up to the current schema.
+
+    Pre-category DBs only have (url, region, added_at, active). We add the
+    new columns idempotently via PRAGMA-driven ADD COLUMN — SQLite has no
+    `ADD COLUMN IF NOT EXISTS`, so we check first.
+    """
+    existing = {row["name"] for row in conn.execute("PRAGMA table_info(nodes)").fetchall()}
+    if "category" not in existing:
+        conn.execute("ALTER TABLE nodes ADD COLUMN category TEXT NOT NULL DEFAULT 'live'")
+    if "description" not in existing:
+        conn.execute("ALTER TABLE nodes ADD COLUMN description TEXT")
+
+
 def initialise(db_path: Path | str = DB_PATH) -> None:
-    """Create the schema if it doesn't exist. Idempotent."""
+    """Create the schema if it doesn't exist, then migrate older shapes. Idempotent."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with connect(db_path) as conn:
         conn.executescript(SCHEMA)
+        _migrate_nodes_table(conn)
 
 
 def sync_nodes(nodes: list[dict], db_path: Path | str = DB_PATH) -> None:
@@ -140,9 +157,20 @@ def sync_nodes(nodes: list[dict], db_path: Path | str = DB_PATH) -> None:
     with connect(db_path) as conn:
         for n in nodes:
             conn.execute(
-                "INSERT INTO nodes(url, region, added_at, active) VALUES(?, ?, ?, 1) "
-                "ON CONFLICT(url) DO UPDATE SET region=excluded.region, active=1",
-                (n["url"], n.get("region"), now),
+                "INSERT INTO nodes(url, region, added_at, active, category, description) "
+                "VALUES(?, ?, ?, 1, ?, ?) "
+                "ON CONFLICT(url) DO UPDATE SET "
+                "  region=excluded.region, "
+                "  active=1, "
+                "  category=excluded.category, "
+                "  description=excluded.description",
+                (
+                    n["url"],
+                    n.get("region"),
+                    now,
+                    n.get("category", "live"),
+                    n.get("description"),
+                ),
             )
         # Mark drops.
         existing = conn.execute("SELECT url FROM nodes").fetchall()

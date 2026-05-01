@@ -45,7 +45,9 @@ health score.
       "block_height": 105471530,
       "block_lag": 0,
       "error_message": null,
-      "reasons": []
+      "reasons": [],
+      "category": "live",
+      "description": null
     }
   ]
 }
@@ -55,6 +57,11 @@ health score.
 penalties the scoring algorithm applied — human-readable strings that
 correspond one-to-one with the rules in
 [MEASUREMENT-METHODOLOGY.md](MEASUREMENT-METHODOLOGY.md).
+
+`category` ∈ {`live`, `testing`, `community`}; an editorial classification
+maintained in `nodes.json` and independent of the measured `status`.
+`description` is an optional operator note shown as a hover tooltip on the
+overview page. See [MEASUREMENT-METHODOLOGY.md § Node categories](MEASUREMENT-METHODOLOGY.md#node-categories).
 
 ### `GET /api/v1/nodes/{node_url}/history?hours=1`
 

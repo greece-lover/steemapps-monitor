@@ -76,6 +76,18 @@ Short glitches are counted separately in daily reports and do not pull down the 
 | 7 days | week-over-week comparison |
 | 30 days | monthly trend, currently informational only |
 
+## Node categories
+
+Each node carries an editorial **category** that is independent of the measured health status. The category answers the question *"how confident are we in this node's role?"* and is set by the maintainer in `nodes.json`; the monitor itself never changes it.
+
+| Category | Meaning | UI badge |
+|---|---|---|
+| `live` | Standard production node — has been measured long enough to be considered part of the canonical set. This is the default. | none (kept off the card to avoid badging eleven nodes the same way) |
+| `testing` | A node under verification. Either a newly-offered node before it joins the live set, or an existing node temporarily under review. | amber `TESTING` pill, with the operator note as a hover tooltip |
+| `community` | A node operated outside the usual hosted-server context — for example a witness's home fibre line. Useful but not graded the same way as commercial endpoints. | blue `COMMUNITY` pill, with the operator note as a hover tooltip |
+
+The category is exposed on `/api/v1/status` as `node.category` and `node.description`. Both fields are optional in `nodes.json`; missing values default to `category="live"` and `description=null`. External consumers can rely on the category to filter, but should treat the health `status` field as the authoritative liveness signal.
+
 ## Explicit non-goals
 
 - We do not measure the full condenser API surface; the dynamic global properties call is a proxy for liveness, not a full health check.

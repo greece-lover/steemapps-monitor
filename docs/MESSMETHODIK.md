@@ -76,6 +76,18 @@ Kurze Störungen werden in Tages-Reports separat gezählt und ziehen den in der 
 | 7 Tage | Wochen-Vergleich |
 | 30 Tage | Monats-Trend, derzeit nur informativ |
 
+## Node-Kategorien
+
+Jeder Node trägt eine redaktionelle **Kategorie**, unabhängig vom gemessenen Health-Status. Die Kategorie beantwortet die Frage *„welche Rolle spielt dieser Node?"* und wird vom Maintainer in `nodes.json` gesetzt; der Monitor selbst ändert sie nie.
+
+| Kategorie | Bedeutung | UI-Badge |
+|---|---|---|
+| `live` | Standard-Produktiv-Node — lange genug gemessen, gehört zum kanonischen Set. Default. | keiner (sonst hingen elf gleiche Badges in der Liste) |
+| `testing` | Node in Verifikations-Phase. Entweder neu angeboten und noch nicht freigegeben, oder bestehender Node vorübergehend unter Beobachtung. | gelbe `TESTING`-Pille mit Operator-Note als Hover-Tooltip |
+| `community` | Node ausserhalb des üblichen Hosting-Kontexts — z.B. Witness-Heim-Glasfaser. Nützlich, aber nicht 1:1 vergleichbar mit kommerziellen Endpoints. | blaue `COMMUNITY`-Pille mit Operator-Note als Hover-Tooltip |
+
+Die Kategorie liegt im `/api/v1/status`-Output als `node.category` und `node.description` an. Beide Felder sind in `nodes.json` optional; fehlt einer, gilt `category="live"` bzw. `description=null`. Externe Consumer dürfen die Kategorie zum Filtern nutzen, sollten den Health-`status` aber als verbindliches Liveness-Signal behandeln.
+
 ## Explizite Nicht-Ziele
 
 - Wir messen nicht die gesamte Condenser-API-Oberfläche; der Aufruf der Dynamic Global Properties ist ein Proxy für Liveness, kein vollständiger Health-Check.

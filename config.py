@@ -40,6 +40,13 @@ API_PORT: int = int(os.environ.get("STEEMAPPS_API_PORT", "8110"))
 # docs/MEASUREMENT-METHODOLOGY.md.
 METHODOLOGY_VERSION: str = "mv1"
 
+# Allowed values for the per-node `category` field in nodes.json. The category
+# is an editorial classification that is orthogonal to the measured health
+# status (status="ok"/"warning"/...). Defaults to "live" when the field is
+# absent, so existing entries without a category continue to work.
+NODE_CATEGORIES: tuple[str, ...] = ("live", "testing", "community")
+DEFAULT_NODE_CATEGORY: str = "live"
+
 # Identifier for this monitor instance. Once multi-location monitoring comes
 # online (Phase 5+), each measurement row carries this so we can tell which
 # observer saw what. Override via env var when running a second instance.
@@ -94,4 +101,12 @@ def load_nodes() -> list[dict]:
         data = json.load(f)
     if not isinstance(data, list) or not all("url" in n for n in data):
         raise ValueError("nodes.json must be a list of objects with a 'url' field")
+    for n in data:
+        cat = n.get("category", DEFAULT_NODE_CATEGORY)
+        if cat not in NODE_CATEGORIES:
+            raise ValueError(
+                f"nodes.json: invalid category {cat!r} for {n.get('url')!r} — "
+                f"must be one of {NODE_CATEGORIES}"
+            )
+        n["category"] = cat
     return data

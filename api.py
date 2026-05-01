@@ -207,6 +207,8 @@ def build_app() -> FastAPI:
                     "block_lag": None,
                     "error_message": None,
                     "reasons": [],
+                    "category": n.get("category", "live"),
+                    "description": n.get("description"),
                 })
                 continue
             # Score uses the last 20 ticks for the error-rate rule; this is
@@ -233,6 +235,8 @@ def build_app() -> FastAPI:
                 "block_lag": block_lag,
                 "error_message": last.get("error_message"),
                 "reasons": breakdown.reasons,
+                "category": n.get("category", "live"),
+                "description": n.get("description"),
             })
         return {
             "generated_at": _utcnow_iso(),

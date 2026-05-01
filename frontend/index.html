@@ -59,6 +59,28 @@
       <div class="match-count" id="match-count" aria-live="polite"></div>
     </div>
 
+    <details class="overview-legend">
+      <summary>Legend — health status &amp; node category</summary>
+      <div class="overview-legend-body">
+        <div class="legend-axis-title">Health status</div>
+        <div class="legend-axis-row">
+          <span class="legend-item"><span class="legend-swatch s-ok"></span>ok</span>
+          <span class="legend-item"><span class="legend-swatch s-deg"></span>warning / critical</span>
+          <span class="legend-item"><span class="legend-swatch s-down"></span>down</span>
+          <span class="legend-item"><span class="legend-swatch s-unknown"></span>unknown</span>
+        </div>
+        <div class="legend-axis-note">Measured every 60 s — see methodology link below.</div>
+
+        <div class="legend-axis-title">Node category</div>
+        <div class="legend-axis-row">
+          <span class="legend-item"><span class="legend-swatch s-ok"></span>live (default — no badge)</span>
+          <span class="legend-item"><span class="legend-swatch c-testing"></span>testing</span>
+          <span class="legend-item"><span class="legend-swatch c-community"></span>community</span>
+        </div>
+        <div class="legend-axis-note">Editorial classification, independent of measured health. Hover the badge to read the operator note.</div>
+      </div>
+    </details>
+
     <div class="controls" id="controls">
       <div class="ctrl">
         <label for="f-region">Region</label>

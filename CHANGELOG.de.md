@@ -7,6 +7,19 @@ Das Format folgt [Keep a Changelog](https://keepachangelog.com/). Bis 1.0 werden
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- Redaktionelle **Node-Kategorie** (orthogonal zum gemessenen Health-Status). Drei Werte: `live` (Default — kein UI-Badge), `testing` (gelbe Pille), `community` (blaue Pille). Optionales `description`-Feld pro Node, als Hover-Tooltip auf dem Badge.
+- `nodes.json` akzeptiert die neuen optionalen Felder `category` und `description`. Validierung in `config.load_nodes()` — ungültige Kategorien lassen den Start fehlschlagen.
+- DB-Schema: `nodes.category` (TEXT NOT NULL DEFAULT 'live') und `nodes.description` (TEXT). Bestehende DBs werden bei `initialise()` per `ALTER TABLE ADD COLUMN` idempotent migriert.
+- `/api/v1/status` liefert pro Node jetzt `category` und `description` mit (am Ende des Objekts angefügt — keine Breaking-Reihenfolge).
+- Übersichts-Seite: aufklappbare Legende, die beide Achsen erklärt (Health-Status / Node-Kategorie).
+- Erster Testing-Node: `api3.justyy.com` (asia, „Justyy private fiber — under verification").
+
+### Hinweise
+
+- Der CSS-Selektor `.status-pill[data-status="degraded"]` matcht weiterhin nicht (API liefert `warning`/`critical`); nicht in dieser Änderung adressiert — separate Aufräum-Session.
+
 ## [Phase 6 Etappe 9] — 2026-04-25
 
 ### Neu

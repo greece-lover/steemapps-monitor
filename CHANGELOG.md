@@ -7,6 +7,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/) and the proje
 
 ## [Unreleased]
 
+### Added
+
+- Editorial **node category** (orthogonal to the measured health status). Three values: `live` (default — no UI badge), `testing` (amber pill), `community` (blue pill). Optional per-node `description`, exposed as a hover tooltip on the badge.
+- `nodes.json` accepts new optional fields `category` and `description`. Validation in `config.load_nodes()` — invalid categories fail loudly at startup.
+- DB schema: `nodes.category` (TEXT NOT NULL DEFAULT 'live') and `nodes.description` (TEXT). Existing DBs are migrated idempotently via `ALTER TABLE ADD COLUMN` on initialise.
+- `/api/v1/status` now returns `category` and `description` per node (appended at the end of each node object — no breaking field reorder).
+- Overview page: foldable legend explaining both axes (health status / node category).
+- First testing node: `api3.justyy.com` (asia, "Justyy private fiber — under verification").
+
+### Notes
+
+- The CSS selector `.status-pill[data-status="degraded"]` still does not match (API emits `warning`/`critical`); not addressed in this change — separate cleanup.
+
 ## [Phase 6 Etappe 9] — 2026-04-25
 
 ### Added
