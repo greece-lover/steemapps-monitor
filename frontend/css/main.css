@@ -201,6 +201,17 @@ a:hover { text-decoration: underline; }
   margin-top: 2px;
 }
 
+/* Operator note shown beneath the node name for testing/community nodes.
+   Stays subtle — italic and one tier below the body text — so it adds
+   context without competing with the score and latency numbers. */
+.node-description {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

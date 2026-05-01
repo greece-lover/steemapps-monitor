@@ -158,11 +158,18 @@
       pills.push(catPill);
     }
 
+    const headLeft = [
+      el('div', { class: 'node-url' }, node.url.replace(/^https?:\/\//, '')),
+    ];
+    // Surface the operator note inline for testing/community nodes.
+    // Live nodes typically have no description, so they stay visually quiet.
+    if (node.description && node.category !== 'live') {
+      headLeft.push(el('div', { class: 'node-description' }, node.description));
+    }
+    headLeft.push(el('div', { class: 'node-region' }, node.region ? `region: ${node.region}` : ''));
+
     const head = el('div', { class: 'node-head' }, [
-      el('div', {}, [
-        el('div', { class: 'node-url' }, node.url.replace(/^https?:\/\//, '')),
-        el('div', { class: 'node-region' }, node.region ? `region: ${node.region}` : ''),
-      ]),
+      el('div', {}, headLeft),
       el('div', { class: 'pill-row' }, pills),
     ]);
 
